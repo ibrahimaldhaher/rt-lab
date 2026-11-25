@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Real-Time IoT Cloud — حساس، معالجة سحابية، منفّذ</title>
+<style>
+:root{
+  --navy:#0f2742; --navy2:#1c3b5f; --gold:#c9a227; --bg:#f3f5f9; --card:#fff;
+  --ink:#16202c; --muted:#66727f; --line:#dfe4ec; --ok:#1e8e5a; --bad:#c8322b; --warn:#b7791f;
+  /* dashboard (dark) */
+  --d-bg:#06101d; --d-panel:#0c1a2c; --d-line:#1c3350; --d-ink:#dce8f6; --d-muted:#7f94ad;
+  --cyan:#38c9ff; --amber:#f2c14e; --red:#ff5a5a; --green:#3ddc97; --violet:#b48cff;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Tahoma,"Noto Sans Arabic",sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;-webkit-text-size-adjust:100%}
+header.app{background:var(--navy);color:#fff;padding:14px 16px;border-bottom:3px solid var(--gold)}
+header.app h1{margin:0;font-size:17px;font-weight:700}
+header.app p{margin:2px 0 0;font-size:12.5px;color:#c9d3e0}
+main{max-width:560px;margin:0 auto;padding:14px 14px 40px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.card h2{margin:0 0 8px;font-size:15px;color:var(--navy)}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+input[type=text],input[type=number],select{width:100%;padding:11px 12px;font:inherit;font-size:16px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+input[type=range]{width:100%;accent-color:var(--navy)}
+button{font:inherit;font-size:16px;font-weight:600;border:0;border-radius:12px;padding:13px 14px;cursor:pointer;background:var(--navy);color:#fff;width:100%}
+button:active{transform:translateY(1px)}
+button:disabled{opacity:.5;cursor:default}
+button.gold{background:var(--gold);color:#1b1500}
+button.ghost{background:#fff;color:var(--navy);border:1px solid var(--line)}
+button.small{font-size:14px;padding:10px 12px}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.modes{display:grid;gap:10px;margin-top:14px}
+.modes button{padding:14px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:start}
+.modes button b{font-size:17px}
+.modes small{font-weight:400;font-size:12.5px;opacity:.9;direction:ltr}
+.modes button.cloudb{background:#123a63}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.pill{font-size:12.5px;padding:5px 10px;border-radius:999px;background:#e9edf3;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:#9aa5b1}
+.pill.on{background:#e3f4ec;color:var(--ok)} .pill.on::before{background:var(--ok)}
+.pill.off{background:#fbe9e7;color:var(--bad)} .pill.off::before{background:var(--bad)}
+.pill.plain::before{display:none}
+.big{font-size:54px;font-weight:800;line-height:1.1;color:var(--navy);font-variant-numeric:tabular-nums;direction:ltr;text-align:center}
+.big small{font-size:16px;font-weight:600;color:var(--muted)}
+.bar{position:relative;height:16px;background:#e9edf3;border-radius:8px;overflow:hidden;direction:ltr;margin:10px 0 4px}
+.bar i{position:absolute;inset:0 auto 0 0;width:0;background:var(--navy2);border-radius:8px;transition:width .08s linear}
+.bar i.hot{background:var(--bad)}
+.bar b{position:absolute;top:-2px;bottom:-2px;width:3px;background:var(--gold)}
+.hint{font-size:12.5px;color:var(--muted);margin:6px 0 0}
+.note{font-size:13px;background:#fff7e0;border:1px solid #ecd58a;color:#6b5200;border-radius:10px;padding:9px 11px;margin-top:10px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:#f6f8fb;border:1px solid var(--line);border-radius:10px;padding:8px 6px;text-align:center}
+.stat b{display:block;font-size:19px;color:var(--navy);font-variant-numeric:tabular-nums;direction:ltr}
+.stat span{font-size:11.5px;color:var(--muted)}
+#stage{border-radius:16px;padding:34px 14px;text-align:center;background:var(--navy);color:#fff;transition:background .15s}
+#stage .ico{font-size:60px;line-height:1}
+#stage .ttl{font-size:22px;font-weight:800;margin-top:6px}
+#stage .sub{font-size:13.5px;color:#c9d3e0;margin-top:2px}
+#stage.alert{background:var(--bad);animation:shake .12s linear 12}
+#stage.test{background:var(--warn)}
+@keyframes shake{0%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}100%{transform:translateX(0)}}
+details{font-size:12.5px;color:var(--muted)} details code{direction:ltr;display:block;background:#f6f8fb;border-radius:8px;padding:6px 8px;margin-top:4px;overflow-x:auto;white-space:nowrap}
+.toast{position:fixed;inset-inline:14px;bottom:14px;background:#16202c;color:#fff;padding:11px 14px;border-radius:12px;font-size:14px;text-align:center;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9;max-width:520px;margin:0 auto}
+.toast.show{opacity:1}
+body.flash{background:var(--bad)} body.flash .card{opacity:.92}
+
+/* ================= CLOUD DASHBOARD (dark) ================= */
+body.dash{background:radial-gradient(1200px 600px at 50% -10%,#0f2a4a 0%,var(--d-bg) 60%);color:var(--d-ink)}
+body.dash header.app{display:none}
+body.dash main{max-width:1700px;padding:10px 14px 12px}
+.topbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.brand{font-size:19px;font-weight:800;letter-spacing:.2px;direction:ltr}
+.brand span{color:var(--cyan)}
+.brand small{display:block;font-size:12px;font-weight:400;color:var(--d-muted);direction:rtl}
+.tb{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{font-size:12.5px;padding:5px 10px;border-radius:999px;border:1px solid var(--d-line);color:var(--d-muted);background:rgba(12,26,44,.7)}
+.chip b{color:var(--d-ink);font-variant-numeric:tabular-nums}
+body.dash .pill{background:rgba(12,26,44,.7);border:1px solid var(--d-line);color:var(--d-muted)}
+body.dash .pill.on{color:var(--green);border-color:#1f5c46} body.dash .pill.on::before{background:var(--green);box-shadow:0 0 8px var(--green)}
+body.dash .pill.off{color:var(--red);border-color:#5c2626} body.dash .pill.off::before{background:var(--red)}
+.dbtn{width:auto;font-size:13.5px;padding:8px 12px;border-radius:10px;background:#12304f;color:var(--d-ink);border:1px solid var(--d-line)}
+.dbtn.pri{background:var(--cyan);color:#04121f;border-color:var(--cyan)}
+.panel{background:linear-gradient(180deg,rgba(15,31,52,.92),rgba(10,22,38,.92));border:1px solid var(--d-line);border-radius:14px;padding:10px 14px}
+.panel h3{margin:0 0 8px;font-size:14.5px;font-weight:700;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.panel h3 small{font-weight:400;font-size:12px;color:var(--d-muted);direction:ltr}
+.dgrid{display:grid;grid-template-columns:1fr;gap:10px}
+.dgrid>.panel{direction:rtl;min-width:0;display:flex;flex-direction:column}
+.dgrid>.pipe{padding:6px 8px;direction:ltr;justify-content:center}
+#pipe{display:block;width:100%;height:auto}
+@media (min-width:760px){.dgrid{grid-template-columns:1fr 1fr}.a-pipe{grid-column:span 2}}
+@media (min-width:1180px){
+  .dgrid{grid-template-columns:repeat(12,1fr);grid-template-rows:auto 1fr;direction:ltr;flex:1}
+  body.dash main{min-height:100vh;display:flex;flex-direction:column}
+  #cloud{flex:1;display:flex;flex-direction:column}
+  .a-pipe{grid-column:span 8}.a-proc{grid-column:span 4}
+  .a-chart{grid-column:span 4}.a-lat{grid-column:span 5}.a-log{grid-column:span 3}
+}
+/* svg */
+#pipe text{font-family:inherit;fill:var(--d-ink)}
+.cloudShape{fill:rgba(56,201,255,.05);stroke:#2b5d86;stroke-width:2;stroke-dasharray:7 6}
+.cloudT{font-size:17px;font-weight:700;fill:var(--cyan)!important;letter-spacing:2px}
+.nodeR{fill:#0f2440;stroke:#2f5680;stroke-width:2}
+.node.hit .nodeR{stroke:var(--cyan);filter:url(#glow)}
+.node.off .nodeR{stroke:#3a4658;stroke-dasharray:5 5} .node.off text{opacity:.55}
+#nEngine.fire .nodeR{stroke:var(--red);fill:#3a1420;filter:url(#glowR)}
+#nActuator.fire .nodeR{stroke:var(--red);fill:#3a1420;filter:url(#glowR)}
+.nT{font-size:18px;font-weight:800;letter-spacing:1px}
+.nS{font-size:14px;fill:var(--d-muted)!important}
+.nV{font-size:20px;font-weight:800;fill:var(--cyan)!important;font-variant-numeric:tabular-nums}
+.nI{font-size:26px}
+.lnk{stroke:#2b4a6d;stroke-width:2.5;fill:none}
+.lnkL{font-size:13.5px;fill:var(--d-muted)!important}
+.lat{font-size:19px;font-weight:800;fill:var(--amber)!important;font-variant-numeric:tabular-nums}
+/* chart */
+.chartBox{position:relative;flex:1;min-height:210px}
+#chart{position:absolute;inset:0;width:100%;height:100%;direction:ltr}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--d-muted);margin-top:6px;direction:ltr}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+/* rule engine */
+.steps{display:grid;gap:7px}
+.step{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:5px 10px;border:1px solid var(--d-line);border-radius:10px;background:rgba(6,16,29,.55)}
+.step .no{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:13px;background:#12304f;color:var(--cyan)}
+.step .t{font-size:13.5px;font-weight:700} .step .t small{display:inline-block;margin:0 10px;font-weight:400;font-size:12px;color:var(--d-muted);direction:ltr}
+.step .v{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;direction:ltr;color:var(--d-ink);white-space:nowrap}
+.step.on{border-color:var(--red);background:rgba(255,90,90,.1)} .step.on .no{background:var(--red);color:#fff}
+.badge{font-size:12.5px;font-weight:800;padding:3px 9px;border-radius:999px;background:#1a2c44;color:var(--d-muted)}
+.badge.t{background:var(--red);color:#fff;box-shadow:0 0 12px rgba(255,90,90,.6)}
+.badge.ok{background:rgba(61,220,151,.15);color:var(--green)} .badge.miss{background:var(--red);color:#fff}
+.ctl{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.ctl label{color:var(--d-muted);margin:0 0 2px;font-size:12px} .ctl label b{color:var(--d-ink)}
+body.dash input[type=range]{accent-color:var(--cyan)}
+body.dash input[type=number]{background:#081526;color:var(--d-ink);border-color:var(--d-line);padding:6px 8px;font-size:14px}
+/* latency */
+.lastH{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13.5px;margin-bottom:6px;direction:ltr}
+.lastH b{font-size:22px;font-variant-numeric:tabular-nums}
+.sbar{position:relative;height:26px;border-radius:8px;background:#081526;border:1px solid var(--d-line);display:flex;overflow:hidden;direction:ltr}
+.sbar i{display:block;height:100%;min-width:0;transition:width .25s}
+.sbar .dl{position:absolute;top:-3px;bottom:-3px;width:2px;background:#fff;box-shadow:0 0 6px #fff}
+.c1{background:var(--cyan)} .c2{background:var(--amber)} .c3{background:var(--violet)} .c4{background:var(--green)}
+.dstats{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:8px 0}
+.dstat{border:1px solid var(--d-line);border-radius:10px;padding:6px 4px;text-align:center;background:rgba(6,16,29,.55)}
+.dstat b{display:block;font-size:18px;font-variant-numeric:tabular-nums;direction:ltr}
+.dstat span{font-size:11px;color:var(--d-muted)}
+.dstat.bad b{color:var(--red)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12.5px;direction:ltr}
+th,td{padding:5px 6px;border-bottom:1px solid var(--d-line);text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums}
+th{color:var(--d-muted);font-weight:600}
+td.miss{color:var(--red);font-weight:800} td.okc{color:var(--green)}
+.sync{font-size:12px;color:var(--d-muted);direction:ltr;margin-top:6px}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+/* log */
+#log{flex:1 1 auto;height:0;min-height:210px;overflow:hidden;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.55;direction:ltr;text-align:left;background:#040b15;border:1px solid var(--d-line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;justify-content:flex-end}
+#log div{flex:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#6f86a1}
+#log .k-cmd{color:var(--red)} #log .k-ack{color:var(--green)} #log .k-telemetry{color:var(--cyan)} #log .k-config{color:var(--amber)} #log .k-presence{color:var(--violet)}
+#log .ts{color:#48607c}
+@media (prefers-reduced-motion:reduce){#stage.alert{animation:none}.sbar i{transition:none}}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header class="app">
+  <h1>Real-Time IoT Cloud</h1>
+  <p>حساس ← كلاود (MQTT + معالجة) ← منفّذ، مع قياس زمن الاستجابة</p>
+</header>
+
+<main>
+<!-- ============ SETUP ============ -->
+<section id="setup">
+  <div class="card">
+    <h2>الإعداد</h2>
+    <label for="room">رمز الغرفة (نفس الرمز على كل الأجهزة)</label>
+    <input id="room" type="text" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="24" dir="ltr">
+    <label for="broker">الوسيط السحابي (MQTT Broker)</label>
+    <select id="broker"></select>
+    <div id="customWrap" hidden>
+      <label for="custom">عنوان الوسيط (wss://host:port/path)</label>
+      <input id="custom" type="text" dir="ltr" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="wss://example.com:8084/mqtt">
+    </div>
+    <div class="modes">
+      <button id="goCloud" class="cloudb"><b>☁ الكلاود ولوحة العرض</b><small>Cloud — الحاسبة</small></button>
+      <button id="goSensor"><b>📱 حساس</b><small>Sensor — iPhone</small></button>
+      <button id="goActuator" class="gold"><b>📳 منفّذ</b><small>Actuator — iPad / Android</small></button>
+    </div>
+    <p class="hint">افتح «الكلاود» على جهاز واحد فقط (الحاسبة)، ثم الحساس والمنفّذ على الباقي بنفس الرمز والوسيط.</p>
+    <div id="secureNote" class="note" hidden>الصفحة ليست على HTTPS، فحساس الحركة لن يعمل. ارفع الملف على استضافة HTTPS (GitHub Pages أو دومينك).</div>
+  </div>
+</section>
+
+<!-- ============ SENSOR ============ -->
+<section id="sensor" hidden>
+  <div class="pills">
+    <span class="pill off" id="sConn">الوسيط: غير متصل</span>
+    <span class="pill off" id="sCloud">المعالج السحابي: غير متصل</span>
+    <span class="pill" id="sPeer">المنفّذ: 0</span>
+    <span class="pill plain" id="sRoom"></span>
+  </div>
+  <div class="card">
+    <h2>قراءة الحساس (Accelerometer)</h2>
+    <div class="big"><span id="val">0.0</span> <small>m/s²</small></div>
+    <div class="bar"><i id="fill"></i><b id="mark"></b></div>
+    <p class="hint">القراءة تُرسل للكلاود كل 50ms. القرار ليس هنا: الكلاود يفلتر القراءات ويطبق القاعدة (العتبة الحالية <b id="sThr">12</b> m/s²) ثم يأمر المنفّذ.</p>
+    <div id="motionNote" class="note" hidden>لم تصل قراءات من حساس الحركة. تأكد من HTTPS ومن السماح بالحساس، أو استعمل «هزّة تجريبية».</div>
+  </div>
+  <div class="card">
+    <div class="stats">
+      <div class="stat"><b id="sSent">0</b><span>قراءات مُرسلة</span></div>
+      <div class="stat"><b id="sAlerts">0</b><span>أوامر أصدرها الكلاود</span></div>
+      <div class="stat"><b>50</b><span>فترة العيّنة ms</span></div>
+    </div>
+    <button id="fake" class="ghost" style="margin-top:10px">هزّة تجريبية</button>
+    <button class="ghost small" style="margin-top:10px" data-back>تغيير الوضع</button>
+  </div>
+</section>
+
+<!-- ============ ACTUATOR ============ -->
+<section id="actuator" hidden>
+  <div class="pills">
+    <span class="pill off" id="aConn">الوسيط: غير متصل</span>
+    <span class="pill off" id="aCloud">المعالج السحابي: غير متصل</span>
+    <span class="pill off" id="aPeer">الحساس: غير متصل</span>
+    <span class="pill plain" id="aRoom"></span>
+  </div>
+  <div id="stage" role="status" aria-live="assertive">
+    <div class="ico" id="aIco">⏳</div>
+    <div class="ttl" id="aTtl">بانتظار أمر الكلاود</div>
+    <div class="sub" id="aSub">لا تُغلق الشاشة</div>
+  </div>
+  <div class="card" style="margin-top:12px">
+    <h2>قراءة الحساس الواصلة من الكلاود</h2>
+    <div class="big"><span id="aVal">–</span> <small>m/s²</small></div>
+    <div class="bar"><i id="aFill"></i></div>
+    <div class="stats" style="margin-top:10px">
+      <div class="stat"><b id="aAlerts">0</b><span>تنبيهات ALERT</span></div>
+      <div class="stat"><b id="aTests">0</b><span>رسائل TEST</span></div>
+      <div class="stat"><b id="aProc">–</b><span>زمن التنفيذ ms</span></div>
+    </div>
+    <div id="vibNote" class="note" hidden>هذا الجهاز لا يدعم الاهتزاز من المتصفح (iPhone / iPad / حاسبة). التنبيه يظهر بوميض الشاشة والصوت — ألغِ الوضع الصامت وارفع الصوت.</div>
+  </div>
+  <div class="card">
+    <div class="row">
+      <button id="tryVib" class="ghost small">جرّب التنبيه</button>
+      <button id="sound" class="ghost small" aria-pressed="true">الصوت: مفعّل</button>
+    </div>
+    <button class="ghost small" style="margin-top:10px" data-back>تغيير الوضع</button>
+  </div>
+</section>
+
+<!-- ============ CLOUD DASHBOARD ============ -->
+<section id="cloud" hidden>
+  <div class="topbar">
+    <div class="brand">☁ Real-Time <span>IoT Cloud</span><small>حساس ← وسيط MQTT ← محرّك القواعد ← منفّذ</small></div>
+    <div class="tb">
+      <span class="pill off" id="cConn">الوسيط: غير متصل</span>
+      <span class="chip">الغرفة: <b id="cRoom" dir="ltr"></b></span>
+      <span class="chip" dir="ltr"><b id="cRate">0</b> msg/s</span>
+      <span class="chip" dir="ltr"><b id="cClock">--:--:--</b></span>
+      <button id="probe" class="dbtn pri">اختبار المسار ×20</button>
+      <button id="cCsv" class="dbtn">CSV</button>
+      <button id="cReset" class="dbtn">تصفير</button>
+      <button id="fs" class="dbtn">ملء الشاشة</button>
+      <button class="dbtn" data-back>خروج</button>
+    </div>
+  </div>
+
+  <div class="dgrid">
+  <div class="panel pipe a-pipe">
+    <svg id="pipe" viewBox="0 0 1100 316" role="img" aria-label="مخطط مسار الرسائل: الحساس، الوسيط السحابي، محرّك القواعد، المنفّذ">
+      <defs>
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="glowR" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2b4a6d"/></marker>
+      </defs>
+      <path class="cloudShape" d="M390 304 A68 68 0 0 1 355 184 A84 84 0 0 1 445 52 A115 60 0 0 1 655 52 A84 84 0 0 1 745 184 A68 68 0 0 1 710 304 Z"/>
+      <text class="cloudT" x="550" y="42" text-anchor="middle">☁ CLOUD</text>
+
+      <!-- links -->
+      <line class="lnk" x1="173" y1="226" x2="446" y2="226" marker-end="url(#ar)"/>
+      <text class="lnkL" x="255" y="180" text-anchor="middle">sensor → cloud</text>
+      <text class="lat" id="latS2C" x="255" y="202" text-anchor="middle">– ms</text>
+      <text class="lnkL" x="255" y="246" text-anchor="middle">telemetry · QoS 0</text>
+      <line class="lnk" x1="520" y1="197" x2="520" y2="156" marker-end="url(#ar)"/>
+      <line class="lnk" x1="580" y1="154" x2="580" y2="195" marker-end="url(#ar)"/>
+      <text class="lnkL" x="512" y="180" text-anchor="end">subscribe</text>
+      <text class="lnkL" x="588" y="180">publish</text>
+      <line class="lnk" x1="654" y1="226" x2="927" y2="226" marker-end="url(#ar)"/>
+      <text class="lnkL" x="845" y="179" text-anchor="middle">cloud → actuator</text>
+      <text class="lat" id="latC2A" x="845" y="201" text-anchor="middle">– ms</text>
+      <text class="lnkL" x="845" y="244" text-anchor="middle">cmd · QoS 1</text>
+      <line class="lnk" x1="927" y1="254" x2="654" y2="254" marker-end="url(#ar)"/>
+      <text class="lnkL" x="845" y="274" text-anchor="middle">ack · QoS 1</text>
+
+      <!-- nodes -->
+      <g class="node off" id="nSensor">
+        <rect class="nodeR" x="20" y="176" width="150" height="110" rx="14"/>
+        <text class="nI" x="95" y="206" text-anchor="middle">📱</text>
+        <text class="nT" x="95" y="231" text-anchor="middle">SENSOR</text>
+        <text class="nS" id="nSensorSub" x="95" y="250" text-anchor="middle">offline</text>
+        <text class="nV" id="nSensorVal" x="95" y="275" text-anchor="middle">– m/s²</text>
+      </g>
+      <g class="node" id="nEngine">
+        <rect class="nodeR" x="435" y="66" width="230" height="86" rx="14"/>
+        <text class="nT" x="550" y="95" text-anchor="middle">⚙ RULE ENGINE</text>
+        <text class="nS" id="nEngineRule" x="550" y="116" text-anchor="middle">IF avg(3) ≥ 12 → ALERT</text>
+        <text class="nV" id="nEngineVal" x="550" y="142" text-anchor="middle">avg = –</text>
+      </g>
+      <g class="node off" id="nBroker">
+        <rect class="nodeR" x="450" y="199" width="200" height="82" rx="14"/>
+        <text class="nT" x="550" y="230" text-anchor="middle">MQTT BROKER</text>
+        <text class="nS" id="nBrokerSub" x="550" y="251" text-anchor="middle">–</text>
+        <text class="nS" id="nBrokerRate" x="550" y="270" text-anchor="middle">0 msg/s</text>
+      </g>
+      <g class="node off" id="nActuator">
+        <rect class="nodeR" x="930" y="176" width="150" height="110" rx="14"/>
+        <text class="nI" x="1005" y="206" text-anchor="middle">📳</text>
+        <text class="nT" x="1005" y="231" text-anchor="middle">ACTUATOR</text>
+        <text class="nS" id="nActSub" x="1005" y="250" text-anchor="middle">offline</text>
+        <text class="nV" id="nActVal" x="1005" y="275" text-anchor="middle">0 alerts</text>
+      </g>
+      <g id="parts"></g>
+    </svg>
+  </div>
+
+    <div class="panel a-proc">
+      <h3>المعالجة السحابية <small>rule engine pipeline</small></h3>
+      <div class="steps">
+        <div class="step" id="st1"><span class="no">1</span><span class="t">استلام القراءة<small>subscribe: telemetry</small></span><span class="v" id="pRaw">–</span></div>
+        <div class="step" id="st2"><span class="no">2</span><span class="t">الفلترة<small id="pFiltL">moving average, N = 3</small></span><span class="v" id="pAvg">–</span></div>
+        <div class="step" id="st3"><span class="no">3</span><span class="t">القاعدة<small id="pRuleL">IF avg ≥ 12</small></span><span class="v"><span class="badge" id="pRule">FALSE</span></span></div>
+        <div class="step" id="st4"><span class="no">4</span><span class="t">القرار<small>publish: cmd (QoS 1)</small></span><span class="v" id="pAct">idle</span></div>
+      </div>
+      <div class="ctl">
+        <div><label for="cThr">العتبة: <b id="cThrV">12</b> m/s²</label><input id="cThr" type="range" min="3" max="30" step="1" value="12"></div>
+        <div><label for="cN">نافذة الفلتر N: <b id="cNV">3</b></label><input id="cN" type="range" min="1" max="10" step="1" value="3"></div>
+        <div><label for="cDl">Deadline (ms)</label><input id="cDl" type="number" inputmode="numeric" min="10" max="5000" step="10" value="300" dir="ltr"></div>
+      </div>
+    </div>
+
+    <div class="panel a-chart">
+      <h3>القراءات الحية من الحساس <small>live telemetry · 15 s</small></h3>
+      <div class="chartBox"><canvas id="chart"></canvas></div>
+      <div class="legend">
+        <span><i style="background:var(--cyan)"></i>raw</span>
+        <span><i style="background:var(--amber)"></i>filtered (moving average)</span>
+        <span><i style="background:var(--red)"></i>threshold / ALERT</span>
+      </div>
+    </div>
+
+    <div class="panel a-lat">
+      <h3>زمن الاستجابة <small>end-to-end response time</small></h3>
+      <div class="lastH"><span id="lTitle">لا توجد أحداث بعد</span><span><b id="lTotal">–</b> ms <span class="badge" id="lRes">–</span></span></div>
+      <div class="sbar" id="sbar"><i class="c1"></i><i class="c2"></i><i class="c3"></i><i class="c4"></i><span class="dl" id="dlMark" hidden></span></div>
+      <div class="legend">
+        <span><i class="c1"></i>s→c <b id="lg1">–</b></span>
+        <span><i class="c2"></i>proc <b id="lg2">–</b></span>
+        <span><i class="c3"></i>c→a <b id="lg3">–</b></span>
+        <span><i class="c4"></i>exec <b id="lg4">–</b></span>
+      </div>
+      <div class="dstats">
+        <div class="dstat"><b id="dN">0</b><span>الأحداث</span></div>
+        <div class="dstat"><b id="dAvg">–</b><span>المتوسط ms</span></div>
+        <div class="dstat"><b id="dMax">–</b><span>WCRT ms</span></div>
+        <div class="dstat"><b id="dJit">–</b><span>Jitter σ ms</span></div>
+        <div class="dstat" id="dMissBox"><b id="dMiss">0</b><span>Deadline miss</span></div>
+      </div>
+      <div class="tw"><table>
+        <thead><tr><th>#</th><th>type</th><th>s→c</th><th>proc</th><th>c→a</th><th>exec</th><th>total</th><th>result</th></tr></thead>
+        <tbody id="cRows"></tbody>
+      </table></div>
+      <div class="sync" id="syncInfo">clock sync (Cristian): waiting for sensor…</div>
+    </div>
+
+    <div class="panel a-log">
+      <h3>تدفق الرسائل عبر الوسيط <small id="logBase">MQTT stream</small></h3>
+      <div id="log" aria-hidden="true"></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>/*******************************************************************************
+ * Copyright (c) 2013, 2016 IBM Corp.
+ *
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License v1.0
+ * and Eclipse Distribution License v1.0 which accompany this distribution.
+ *
+ * The Eclipse Public License is available at
+ *    http://www.eclipse.org/legal/epl-v10.html
+ * and the Eclipse Distribution License is available at
+ *   http://www.eclipse.org/org/documents/edl-v10.php.
+ *
+ *******************************************************************************/
+(function(t,q){"object"===typeof exports&&"object"===typeof module?module.exports=q():"function"===typeof define&&define.amd?define(q):"object"===typeof exports?exports=q():t.Paho=q()})(this,function(){return function(t){function q(a,b,c){b[c++]=a>>8;b[c++]=a%256;return c}function r(a,b,c,k){k=q(b,c,k);E(a,c,k);return k+b}function n(a){for(var b=0,c=0;c<a.length;c++){var k=a.charCodeAt(c);2047<k?(55296<=k&&56319>=k&&(c++,b++),b+=3):127<k?b+=2:b++}return b}function E(a,b,c){for(var k=0;k<a.length;k++){var e=
+    a.charCodeAt(k);if(55296<=e&&56319>=e){var g=a.charCodeAt(++k);if(isNaN(g))throw Error(f(h.MALFORMED_UNICODE,[e,g]));e=(e-55296<<10)+(g-56320)+65536}127>=e?b[c++]=e:(2047>=e?b[c++]=e>>6&31|192:(65535>=e?b[c++]=e>>12&15|224:(b[c++]=e>>18&7|240,b[c++]=e>>12&63|128),b[c++]=e>>6&63|128),b[c++]=e&63|128)}return b}function F(a,b,c){for(var k="",e,g=b;g<b+c;){e=a[g++];if(!(128>e)){var m=a[g++]-128;if(0>m)throw Error(f(h.MALFORMED_UTF,[e.toString(16),m.toString(16),""]));if(224>e)e=64*(e-192)+m;else{var d=
+    a[g++]-128;if(0>d)throw Error(f(h.MALFORMED_UTF,[e.toString(16),m.toString(16),d.toString(16)]));if(240>e)e=4096*(e-224)+64*m+d;else{var l=a[g++]-128;if(0>l)throw Error(f(h.MALFORMED_UTF,[e.toString(16),m.toString(16),d.toString(16),l.toString(16)]));if(248>e)e=262144*(e-240)+4096*m+64*d+l;else throw Error(f(h.MALFORMED_UTF,[e.toString(16),m.toString(16),d.toString(16),l.toString(16)]));}}}65535<e&&(e-=65536,k+=String.fromCharCode(55296+(e>>10)),e=56320+(e&1023));k+=String.fromCharCode(e)}return k}
+    var s=t.localStorage||function(){var a={};return{setItem:function(b,c){a[b]=c},getItem:function(b){return a[b]},removeItem:function(b){delete a[b]}}}(),A=function(a,b){for(var c in a)if(a.hasOwnProperty(c))if(b.hasOwnProperty(c)){if(typeof a[c]!==b[c])throw Error(f(h.INVALID_TYPE,[typeof a[c],c]));}else{c="Unknown property, "+c+". Valid properties are:";for(var k in b)b.hasOwnProperty(k)&&(c=c+" "+k);throw Error(c);}},u=function(a,b){return function(){return a.apply(b,arguments)}},h={OK:{code:0,text:"AMQJSC0000I OK."},
+    CONNECT_TIMEOUT:{code:1,text:"AMQJSC0001E Connect timed out."},SUBSCRIBE_TIMEOUT:{code:2,text:"AMQJS0002E Subscribe timed out."},UNSUBSCRIBE_TIMEOUT:{code:3,text:"AMQJS0003E Unsubscribe timed out."},PING_TIMEOUT:{code:4,text:"AMQJS0004E Ping timed out."},INTERNAL_ERROR:{code:5,text:"AMQJS0005E Internal error. Error Message: {0}, Stack trace: {1}"},CONNACK_RETURNCODE:{code:6,text:"AMQJS0006E Bad Connack return code:{0} {1}."},SOCKET_ERROR:{code:7,text:"AMQJS0007E Socket error:{0}."},SOCKET_CLOSE:{code:8,
+    text:"AMQJS0008I Socket closed."},MALFORMED_UTF:{code:9,text:"AMQJS0009E Malformed UTF data:{0} {1} {2}."},UNSUPPORTED:{code:10,text:"AMQJS0010E {0} is not supported by this browser."},INVALID_STATE:{code:11,text:"AMQJS0011E Invalid state {0}."},INVALID_TYPE:{code:12,text:"AMQJS0012E Invalid type {0} for {1}."},INVALID_ARGUMENT:{code:13,text:"AMQJS0013E Invalid argument {0} for {1}."},UNSUPPORTED_OPERATION:{code:14,text:"AMQJS0014E Unsupported operation."},INVALID_STORED_DATA:{code:15,text:"AMQJS0015E Invalid data in local storage key\x3d{0} value\x3d{1}."},
+    INVALID_MQTT_MESSAGE_TYPE:{code:16,text:"AMQJS0016E Invalid MQTT message type {0}."},MALFORMED_UNICODE:{code:17,text:"AMQJS0017E Malformed Unicode string:{0} {1}."},BUFFER_FULL:{code:18,text:"AMQJS0018E Message buffer is full, maximum buffer size: {0}."}},H={0:"Connection Accepted",1:"Connection Refused: unacceptable protocol version",2:"Connection Refused: identifier rejected",3:"Connection Refused: server unavailable",4:"Connection Refused: bad user name or password",5:"Connection Refused: not authorized"},
+    f=function(a,b){var c=a.text;if(b)for(var k,e,g=0;g<b.length;g++)if(k="{"+g+"}",e=c.indexOf(k),0<e)var h=c.substring(0,e),c=c.substring(e+k.length),c=h+b[g]+c;return c},B=[0,6,77,81,73,115,100,112,3],C=[0,4,77,81,84,84,4],p=function(a,b){this.type=a;for(var c in b)b.hasOwnProperty(c)&&(this[c]=b[c])};p.prototype.encode=function(){var a=(this.type&15)<<4,b=0,c=[],k=0,e;void 0!==this.messageIdentifier&&(b+=2);switch(this.type){case 1:switch(this.mqttVersion){case 3:b+=B.length+3;break;case 4:b+=C.length+
+    3}b+=n(this.clientId)+2;void 0!==this.willMessage&&(b+=n(this.willMessage.destinationName)+2,e=this.willMessage.payloadBytes,e instanceof Uint8Array||(e=new Uint8Array(h)),b+=e.byteLength+2);void 0!==this.userName&&(b+=n(this.userName)+2);void 0!==this.password&&(b+=n(this.password)+2);break;case 8:for(var a=a|2,g=0;g<this.topics.length;g++)c[g]=n(this.topics[g]),b+=c[g]+2;b+=this.requestedQos.length;break;case 10:a|=2;for(g=0;g<this.topics.length;g++)c[g]=n(this.topics[g]),b+=c[g]+2;break;case 6:a|=
+    2;break;case 3:this.payloadMessage.duplicate&&(a|=8);a=a|=this.payloadMessage.qos<<1;this.payloadMessage.retained&&(a|=1);var k=n(this.payloadMessage.destinationName),h=this.payloadMessage.payloadBytes,b=b+(k+2)+h.byteLength;h instanceof ArrayBuffer?h=new Uint8Array(h):h instanceof Uint8Array||(h=new Uint8Array(h.buffer))}var f=b,g=Array(1),d=0;do{var z=f%128,f=f>>7;0<f&&(z|=128);g[d++]=z}while(0<f&&4>d);f=g.length+1;b=new ArrayBuffer(b+f);d=new Uint8Array(b);d[0]=a;d.set(g,1);if(3==this.type)f=r(this.payloadMessage.destinationName,
+    k,d,f);else if(1==this.type){switch(this.mqttVersion){case 3:d.set(B,f);f+=B.length;break;case 4:d.set(C,f),f+=C.length}a=0;this.cleanSession&&(a=2);void 0!==this.willMessage&&(a=a|4|this.willMessage.qos<<3,this.willMessage.retained&&(a|=32));void 0!==this.userName&&(a|=128);void 0!==this.password&&(a|=64);d[f++]=a;f=q(this.keepAliveInterval,d,f)}void 0!==this.messageIdentifier&&(f=q(this.messageIdentifier,d,f));switch(this.type){case 1:f=r(this.clientId,n(this.clientId),d,f);void 0!==this.willMessage&&
+    (f=r(this.willMessage.destinationName,n(this.willMessage.destinationName),d,f),f=q(e.byteLength,d,f),d.set(e,f),f+=e.byteLength);void 0!==this.userName&&(f=r(this.userName,n(this.userName),d,f));void 0!==this.password&&r(this.password,n(this.password),d,f);break;case 3:d.set(h,f);break;case 8:for(g=0;g<this.topics.length;g++)f=r(this.topics[g],c[g],d,f),d[f++]=this.requestedQos[g];break;case 10:for(g=0;g<this.topics.length;g++)f=r(this.topics[g],c[g],d,f)}return b};var G=function(a,b){this._client=
+    a;this._keepAliveInterval=1E3*b;this.isReset=!1;var c=(new p(12)).encode(),k=function(a){return function(){return e.apply(a)}},e=function(){this.isReset?(this.isReset=!1,this._client._trace("Pinger.doPing","send PINGREQ"),this._client.socket.send(c),this.timeout=setTimeout(k(this),this._keepAliveInterval)):(this._client._trace("Pinger.doPing","Timed out"),this._client._disconnected(h.PING_TIMEOUT.code,f(h.PING_TIMEOUT)))};this.reset=function(){this.isReset=!0;clearTimeout(this.timeout);0<this._keepAliveInterval&&
+    (this.timeout=setTimeout(k(this),this._keepAliveInterval))};this.cancel=function(){clearTimeout(this.timeout)}},v=function(a,b,c,f){b||(b=30);this.timeout=setTimeout(function(a,b,c){return function(){return a.apply(b,c)}}(c,a,f),1E3*b);this.cancel=function(){clearTimeout(this.timeout)}},d=function(a,b,c,d,e){if(!("WebSocket"in t&&null!==t.WebSocket))throw Error(f(h.UNSUPPORTED,["WebSocket"]));if(!("ArrayBuffer"in t&&null!==t.ArrayBuffer))throw Error(f(h.UNSUPPORTED,["ArrayBuffer"]));this._trace("Paho.Client",
+    a,b,c,d,e);this.host=b;this.port=c;this.path=d;this.uri=a;this.clientId=e;this._wsuri=null;this._localKey=b+":"+c+("/mqtt"!=d?":"+d:"")+":"+e+":";this._msg_queue=[];this._buffered_msg_queue=[];this._sentMessages={};this._receivedMessages={};this._notify_msg_sent={};this._message_identifier=1;this._sequence=0;for(var g in s)0!==g.indexOf("Sent:"+this._localKey)&&0!==g.indexOf("Received:"+this._localKey)||this.restore(g)};d.prototype.host=null;d.prototype.port=null;d.prototype.path=null;d.prototype.uri=
+    null;d.prototype.clientId=null;d.prototype.socket=null;d.prototype.connected=!1;d.prototype.maxMessageIdentifier=65536;d.prototype.connectOptions=null;d.prototype.hostIndex=null;d.prototype.onConnected=null;d.prototype.onConnectionLost=null;d.prototype.onMessageDelivered=null;d.prototype.onMessageArrived=null;d.prototype.traceFunction=null;d.prototype._msg_queue=null;d.prototype._buffered_msg_queue=null;d.prototype._connectTimeout=null;d.prototype.sendPinger=null;d.prototype.receivePinger=null;d.prototype._reconnectInterval=
+    1;d.prototype._reconnecting=!1;d.prototype._reconnectTimeout=null;d.prototype.disconnectedPublishing=!1;d.prototype.disconnectedBufferSize=5E3;d.prototype.receiveBuffer=null;d.prototype._traceBuffer=null;d.prototype._MAX_TRACE_ENTRIES=100;d.prototype.connect=function(a){var b=this._traceMask(a,"password");this._trace("Client.connect",b,this.socket,this.connected);if(this.connected)throw Error(f(h.INVALID_STATE,["already connected"]));if(this.socket)throw Error(f(h.INVALID_STATE,["already connected"]));
+    this._reconnecting&&(this._reconnectTimeout.cancel(),this._reconnectTimeout=null,this._reconnecting=!1);this.connectOptions=a;this._reconnectInterval=1;this._reconnecting=!1;a.uris?(this.hostIndex=0,this._doConnect(a.uris[0])):this._doConnect(this.uri)};d.prototype.subscribe=function(a,b){this._trace("Client.subscribe",a,b);if(!this.connected)throw Error(f(h.INVALID_STATE,["not connected"]));var c=new p(8);c.topics=a.constructor===Array?a:[a];void 0===b.qos&&(b.qos=0);c.requestedQos=[];for(var d=
+    0;d<c.topics.length;d++)c.requestedQos[d]=b.qos;b.onSuccess&&(c.onSuccess=function(a){b.onSuccess({invocationContext:b.invocationContext,grantedQos:a})});b.onFailure&&(c.onFailure=function(a){b.onFailure({invocationContext:b.invocationContext,errorCode:a,errorMessage:f(a)})});b.timeout&&(c.timeOut=new v(this,b.timeout,b.onFailure,[{invocationContext:b.invocationContext,errorCode:h.SUBSCRIBE_TIMEOUT.code,errorMessage:f(h.SUBSCRIBE_TIMEOUT)}]));this._requires_ack(c);this._schedule_message(c)};d.prototype.unsubscribe=
+    function(a,b){this._trace("Client.unsubscribe",a,b);if(!this.connected)throw Error(f(h.INVALID_STATE,["not connected"]));var c=new p(10);c.topics=a.constructor===Array?a:[a];b.onSuccess&&(c.callback=function(){b.onSuccess({invocationContext:b.invocationContext})});b.timeout&&(c.timeOut=new v(this,b.timeout,b.onFailure,[{invocationContext:b.invocationContext,errorCode:h.UNSUBSCRIBE_TIMEOUT.code,errorMessage:f(h.UNSUBSCRIBE_TIMEOUT)}]));this._requires_ack(c);this._schedule_message(c)};d.prototype.send=
+    function(a){this._trace("Client.send",a);var b=new p(3);b.payloadMessage=a;if(this.connected)0<a.qos?this._requires_ack(b):this.onMessageDelivered&&(this._notify_msg_sent[b]=this.onMessageDelivered(b.payloadMessage)),this._schedule_message(b);else if(this._reconnecting&&this.disconnectedPublishing){if(Object.keys(this._sentMessages).length+this._buffered_msg_queue.length>this.disconnectedBufferSize)throw Error(f(h.BUFFER_FULL,[this.disconnectedBufferSize]));0<a.qos?this._requires_ack(b):(b.sequence=
+    ++this._sequence,this._buffered_msg_queue.unshift(b))}else throw Error(f(h.INVALID_STATE,["not connected"]));};d.prototype.disconnect=function(){this._trace("Client.disconnect");this._reconnecting&&(this._reconnectTimeout.cancel(),this._reconnectTimeout=null,this._reconnecting=!1);if(!this.socket)throw Error(f(h.INVALID_STATE,["not connecting or connected"]));var a=new p(14);this._notify_msg_sent[a]=u(this._disconnected,this);this._schedule_message(a)};d.prototype.getTraceLog=function(){if(null!==
+    this._traceBuffer){this._trace("Client.getTraceLog",new Date);this._trace("Client.getTraceLog in flight messages",this._sentMessages.length);for(var a in this._sentMessages)this._trace("_sentMessages ",a,this._sentMessages[a]);for(a in this._receivedMessages)this._trace("_receivedMessages ",a,this._receivedMessages[a]);return this._traceBuffer}};d.prototype.startTrace=function(){null===this._traceBuffer&&(this._traceBuffer=[]);this._trace("Client.startTrace",new Date,"1.1.0-2018-11-22T11:35:36Z")};d.prototype.stopTrace=
+    function(){delete this._traceBuffer};d.prototype._doConnect=function(a){this.connectOptions.useSSL&&(a=a.split(":"),a[0]="wss",a=a.join(":"));this._wsuri=a;this.connected=!1;this.socket=4>this.connectOptions.mqttVersion?new WebSocket(a,["mqttv3.1"]):new WebSocket(a,["mqtt"]);this.socket.binaryType="arraybuffer";this.socket.onopen=u(this._on_socket_open,this);this.socket.onmessage=u(this._on_socket_message,this);this.socket.onerror=u(this._on_socket_error,this);this.socket.onclose=u(this._on_socket_close,
+    this);this.sendPinger=new G(this,this.connectOptions.keepAliveInterval);this.receivePinger=new G(this,this.connectOptions.keepAliveInterval);this._connectTimeout&&(this._connectTimeout.cancel(),this._connectTimeout=null);this._connectTimeout=new v(this,this.connectOptions.timeout,this._disconnected,[h.CONNECT_TIMEOUT.code,f(h.CONNECT_TIMEOUT)])};d.prototype._schedule_message=function(a){this._msg_queue.unshift(a);this.connected&&this._process_queue()};d.prototype.store=function(a,b){var c={type:b.type,
+    messageIdentifier:b.messageIdentifier,version:1};switch(b.type){case 3:b.pubRecReceived&&(c.pubRecReceived=!0);c.payloadMessage={};for(var d="",e=b.payloadMessage.payloadBytes,g=0;g<e.length;g++)d=15>=e[g]?d+"0"+e[g].toString(16):d+e[g].toString(16);c.payloadMessage.payloadHex=d;c.payloadMessage.qos=b.payloadMessage.qos;c.payloadMessage.destinationName=b.payloadMessage.destinationName;b.payloadMessage.duplicate&&(c.payloadMessage.duplicate=!0);b.payloadMessage.retained&&(c.payloadMessage.retained=
+    !0);0===a.indexOf("Sent:")&&(void 0===b.sequence&&(b.sequence=++this._sequence),c.sequence=b.sequence);break;default:throw Error(f(h.INVALID_STORED_DATA,[a+this._localKey+b.messageIdentifier,c]));}s.setItem(a+this._localKey+b.messageIdentifier,JSON.stringify(c))};d.prototype.restore=function(a){var b=s.getItem(a),c=JSON.parse(b),d=new p(c.type,c);switch(c.type){case 3:for(var b=c.payloadMessage.payloadHex,e=new ArrayBuffer(b.length/2),e=new Uint8Array(e),g=0;2<=b.length;){var m=parseInt(b.substring(0,
+    2),16),b=b.substring(2,b.length);e[g++]=m}b=new w(e);b.qos=c.payloadMessage.qos;b.destinationName=c.payloadMessage.destinationName;c.payloadMessage.duplicate&&(b.duplicate=!0);c.payloadMessage.retained&&(b.retained=!0);d.payloadMessage=b;break;default:throw Error(f(h.INVALID_STORED_DATA,[a,b]));}0===a.indexOf("Sent:"+this._localKey)?(d.payloadMessage.duplicate=!0,this._sentMessages[d.messageIdentifier]=d):0===a.indexOf("Received:"+this._localKey)&&(this._receivedMessages[d.messageIdentifier]=d)};
+    d.prototype._process_queue=function(){for(var a=null;a=this._msg_queue.pop();)this._socket_send(a),this._notify_msg_sent[a]&&(this._notify_msg_sent[a](),delete this._notify_msg_sent[a])};d.prototype._requires_ack=function(a){var b=Object.keys(this._sentMessages).length;if(b>this.maxMessageIdentifier)throw Error("Too many messages:"+b);for(;void 0!==this._sentMessages[this._message_identifier];)this._message_identifier++;a.messageIdentifier=this._message_identifier;this._sentMessages[a.messageIdentifier]=
+    a;3===a.type&&this.store("Sent:",a);this._message_identifier===this.maxMessageIdentifier&&(this._message_identifier=1)};d.prototype._on_socket_open=function(){var a=new p(1,this.connectOptions);a.clientId=this.clientId;this._socket_send(a)};d.prototype._on_socket_message=function(a){this._trace("Client._on_socket_message",a.data);a=this._deframeMessages(a.data);for(var b=0;b<a.length;b+=1)this._handleMessage(a[b])};d.prototype._deframeMessages=function(a){a=new Uint8Array(a);var b=[];if(this.receiveBuffer){var c=
+    new Uint8Array(this.receiveBuffer.length+a.length);c.set(this.receiveBuffer);c.set(a,this.receiveBuffer.length);a=c;delete this.receiveBuffer}try{for(c=0;c<a.length;){var d;a:{var e=a,g=c,m=g,n=e[g],l=n>>4,z=n&15,g=g+1,x=void 0,D=0,q=1;do{if(g==e.length){d=[null,m];break a}x=e[g++];D+=(x&127)*q;q*=128}while(0!==(x&128));x=g+D;if(x>e.length)d=[null,m];else{var y=new p(l);switch(l){case 2:e[g++]&1&&(y.sessionPresent=!0);y.returnCode=e[g++];break;case 3:var m=z>>1&3,s=256*e[g]+e[g+1],g=g+2,t=F(e,g,s),
+    g=g+s;0<m&&(y.messageIdentifier=256*e[g]+e[g+1],g+=2);var r=new w(e.subarray(g,x));1==(z&1)&&(r.retained=!0);8==(z&8)&&(r.duplicate=!0);r.qos=m;r.destinationName=t;y.payloadMessage=r;break;case 4:case 5:case 6:case 7:case 11:y.messageIdentifier=256*e[g]+e[g+1];break;case 9:y.messageIdentifier=256*e[g]+e[g+1],g+=2,y.returnCode=e.subarray(g,x)}d=[y,x]}}var u=d[0],c=d[1];if(null!==u)b.push(u);else break}c<a.length&&(this.receiveBuffer=a.subarray(c))}catch(v){d="undefined"==v.hasOwnProperty("stack")?
+    v.stack.toString():"No Error Stack Available";this._disconnected(h.INTERNAL_ERROR.code,f(h.INTERNAL_ERROR,[v.message,d]));return}return b};d.prototype._handleMessage=function(a){this._trace("Client._handleMessage",a);try{switch(a.type){case 2:this._connectTimeout.cancel();this._reconnectTimeout&&this._reconnectTimeout.cancel();if(this.connectOptions.cleanSession){for(var b in this._sentMessages){var c=this._sentMessages[b];s.removeItem("Sent:"+this._localKey+c.messageIdentifier)}this._sentMessages=
+    {};for(b in this._receivedMessages){var d=this._receivedMessages[b];s.removeItem("Received:"+this._localKey+d.messageIdentifier)}this._receivedMessages={}}if(0===a.returnCode)this.connected=!0,this.connectOptions.uris&&(this.hostIndex=this.connectOptions.uris.length);else{this._disconnected(h.CONNACK_RETURNCODE.code,f(h.CONNACK_RETURNCODE,[a.returnCode,H[a.returnCode]]));break}a=[];for(var e in this._sentMessages)this._sentMessages.hasOwnProperty(e)&&a.push(this._sentMessages[e]);if(0<this._buffered_msg_queue.length)for(e=
+    null;e=this._buffered_msg_queue.pop();)a.push(e),this.onMessageDelivered&&(this._notify_msg_sent[e]=this.onMessageDelivered(e.payloadMessage));a=a.sort(function(a,b){return a.sequence-b.sequence});e=0;for(var g=a.length;e<g;e++)if(c=a[e],3==c.type&&c.pubRecReceived){var m=new p(6,{messageIdentifier:c.messageIdentifier});this._schedule_message(m)}else this._schedule_message(c);if(this.connectOptions.onSuccess)this.connectOptions.onSuccess({invocationContext:this.connectOptions.invocationContext});
+    c=!1;this._reconnecting&&(c=!0,this._reconnectInterval=1,this._reconnecting=!1);this._connected(c,this._wsuri);this._process_queue();break;case 3:this._receivePublish(a);break;case 4:if(c=this._sentMessages[a.messageIdentifier])if(delete this._sentMessages[a.messageIdentifier],s.removeItem("Sent:"+this._localKey+a.messageIdentifier),this.onMessageDelivered)this.onMessageDelivered(c.payloadMessage);break;case 5:if(c=this._sentMessages[a.messageIdentifier])c.pubRecReceived=!0,m=new p(6,{messageIdentifier:a.messageIdentifier}),
+    this.store("Sent:",c),this._schedule_message(m);break;case 6:d=this._receivedMessages[a.messageIdentifier];s.removeItem("Received:"+this._localKey+a.messageIdentifier);d&&(this._receiveMessage(d),delete this._receivedMessages[a.messageIdentifier]);var n=new p(7,{messageIdentifier:a.messageIdentifier});this._schedule_message(n);break;case 7:c=this._sentMessages[a.messageIdentifier];delete this._sentMessages[a.messageIdentifier];s.removeItem("Sent:"+this._localKey+a.messageIdentifier);if(this.onMessageDelivered)this.onMessageDelivered(c.payloadMessage);
+    break;case 9:if(c=this._sentMessages[a.messageIdentifier]){c.timeOut&&c.timeOut.cancel();if(128===a.returnCode[0]){if(c.onFailure)c.onFailure(a.returnCode)}else if(c.onSuccess)c.onSuccess(a.returnCode);delete this._sentMessages[a.messageIdentifier]}break;case 11:if(c=this._sentMessages[a.messageIdentifier])c.timeOut&&c.timeOut.cancel(),c.callback&&c.callback(),delete this._sentMessages[a.messageIdentifier];break;case 13:this.sendPinger.reset();break;case 14:this._disconnected(h.INVALID_MQTT_MESSAGE_TYPE.code,
+    f(h.INVALID_MQTT_MESSAGE_TYPE,[a.type]));break;default:this._disconnected(h.INVALID_MQTT_MESSAGE_TYPE.code,f(h.INVALID_MQTT_MESSAGE_TYPE,[a.type]))}}catch(l){c="undefined"==l.hasOwnProperty("stack")?l.stack.toString():"No Error Stack Available",this._disconnected(h.INTERNAL_ERROR.code,f(h.INTERNAL_ERROR,[l.message,c]))}};d.prototype._on_socket_error=function(a){this._reconnecting||this._disconnected(h.SOCKET_ERROR.code,f(h.SOCKET_ERROR,[a.data]))};d.prototype._on_socket_close=function(){this._reconnecting||
+    this._disconnected(h.SOCKET_CLOSE.code,f(h.SOCKET_CLOSE))};d.prototype._socket_send=function(a){if(1==a.type){var b=this._traceMask(a,"password");this._trace("Client._socket_send",b)}else this._trace("Client._socket_send",a);this.socket.send(a.encode());this.sendPinger.reset()};d.prototype._receivePublish=function(a){switch(a.payloadMessage.qos){case "undefined":case 0:this._receiveMessage(a);break;case 1:var b=new p(4,{messageIdentifier:a.messageIdentifier});this._schedule_message(b);this._receiveMessage(a);
+    break;case 2:this._receivedMessages[a.messageIdentifier]=a;this.store("Received:",a);a=new p(5,{messageIdentifier:a.messageIdentifier});this._schedule_message(a);break;default:throw Error("Invaild qos\x3d"+a.payloadMessage.qos);}};d.prototype._receiveMessage=function(a){if(this.onMessageArrived)this.onMessageArrived(a.payloadMessage)};d.prototype._connected=function(a,b){if(this.onConnected)this.onConnected(a,b)};d.prototype._reconnect=function(){this._trace("Client._reconnect");this.connected||(this._reconnecting=
+    !0,this.sendPinger.cancel(),this.receivePinger.cancel(),128>this._reconnectInterval&&(this._reconnectInterval*=2),this.connectOptions.uris?(this.hostIndex=0,this._doConnect(this.connectOptions.uris[0])):this._doConnect(this.uri))};d.prototype._disconnected=function(a,b){this._trace("Client._disconnected",a,b);if(void 0!==a&&this._reconnecting)this._reconnectTimeout=new v(this,this._reconnectInterval,this._reconnect);else if(this.sendPinger.cancel(),this.receivePinger.cancel(),this._connectTimeout&&
+    (this._connectTimeout.cancel(),this._connectTimeout=null),this._msg_queue=[],this._buffered_msg_queue=[],this._notify_msg_sent={},this.socket&&(this.socket.onopen=null,this.socket.onmessage=null,this.socket.onerror=null,this.socket.onclose=null,1===this.socket.readyState&&this.socket.close(),delete this.socket),this.connectOptions.uris&&this.hostIndex<this.connectOptions.uris.length-1)this.hostIndex++,this._doConnect(this.connectOptions.uris[this.hostIndex]);else if(void 0===a&&(a=h.OK.code,b=f(h.OK)),
+    this.connected){this.connected=!1;if(this.onConnectionLost)this.onConnectionLost({errorCode:a,errorMessage:b,reconnect:this.connectOptions.reconnect,uri:this._wsuri});a!==h.OK.code&&this.connectOptions.reconnect&&(this._reconnectInterval=1,this._reconnect())}else if(4===this.connectOptions.mqttVersion&&!1===this.connectOptions.mqttVersionExplicit)this._trace("Failed to connect V4, dropping back to V3"),this.connectOptions.mqttVersion=3,this.connectOptions.uris?(this.hostIndex=0,this._doConnect(this.connectOptions.uris[0])):
+    this._doConnect(this.uri);else if(this.connectOptions.onFailure)this.connectOptions.onFailure({invocationContext:this.connectOptions.invocationContext,errorCode:a,errorMessage:b})};d.prototype._trace=function(){if(this.traceFunction){var a=Array.prototype.slice.call(arguments),b;for(b in a)"undefined"!==typeof a[b]&&a.splice(b,1,JSON.stringify(a[b]));b=a.join("");this.traceFunction({severity:"Debug",message:b})}if(null!==this._traceBuffer)for(b=0,a=arguments.length;b<a;b++)this._traceBuffer.length==
+    this._MAX_TRACE_ENTRIES&&this._traceBuffer.shift(),0===b?this._traceBuffer.push(arguments[b]):"undefined"===typeof arguments[b]?this._traceBuffer.push(arguments[b]):this._traceBuffer.push("  "+JSON.stringify(arguments[b]))};d.prototype._traceMask=function(a,b){var c={},d;for(d in a)a.hasOwnProperty(d)&&(c[d]=d==b?"******":a[d]);return c};var w=function(a){var b;if("string"===typeof a||a instanceof ArrayBuffer||ArrayBuffer.isView(a)&&!(a instanceof DataView))b=a;else throw f(h.INVALID_ARGUMENT,[a,
+    "newPayload"]);var c,d=0,e=!1,g=!1;Object.defineProperties(this,{payloadString:{enumerable:!0,get:function(){return"string"===typeof b?b:F(b,0,b.length)}},payloadBytes:{enumerable:!0,get:function(){if("string"===typeof b){var a=new ArrayBuffer(n(b)),a=new Uint8Array(a);E(b,a,0);return a}return b}},destinationName:{enumerable:!0,get:function(){return c},set:function(a){if("string"===typeof a)c=a;else throw Error(f(h.INVALID_ARGUMENT,[a,"newDestinationName"]));}},qos:{enumerable:!0,get:function(){return d},
+    set:function(a){if(0===a||1===a||2===a)d=a;else throw Error("Invalid argument:"+a);}},retained:{enumerable:!0,get:function(){return e},set:function(a){if("boolean"===typeof a)e=a;else throw Error(f(h.INVALID_ARGUMENT,[a,"newRetained"]));}},topic:{enumerable:!0,get:function(){return c},set:function(a){c=a}},duplicate:{enumerable:!0,get:function(){return g},set:function(a){g=a}}})};return{Client:function(a,b,c,k){var e;if("string"!==typeof a)throw Error(f(h.INVALID_TYPE,[typeof a,"host"]));if(2==arguments.length){k=
+    b;e=a;var g=e.match(/^(wss?):\/\/((\[(.+)\])|([^\/]+?))(:(\d+))?(\/.*)$/);if(g)a=g[4]||g[2],b=parseInt(g[7]),c=g[8];else throw Error(f(h.INVALID_ARGUMENT,[a,"host"]));}else{3==arguments.length&&(k=c,c="/mqtt");if("number"!==typeof b||0>b)throw Error(f(h.INVALID_TYPE,[typeof b,"port"]));if("string"!==typeof c)throw Error(f(h.INVALID_TYPE,[typeof c,"path"]));e="ws://"+(-1!==a.indexOf(":")&&"["!==a.slice(0,1)&&"]"!==a.slice(-1)?"["+a+"]":a)+":"+b+c}for(var m=g=0;m<k.length;m++){var n=k.charCodeAt(m);
+    55296<=n&&56319>=n&&m++;g++}if("string"!==typeof k||65535<g)throw Error(f(h.INVALID_ARGUMENT,[k,"clientId"]));var l=new d(e,a,b,c,k);Object.defineProperties(this,{host:{get:function(){return a},set:function(){throw Error(f(h.UNSUPPORTED_OPERATION));}},port:{get:function(){return b},set:function(){throw Error(f(h.UNSUPPORTED_OPERATION));}},path:{get:function(){return c},set:function(){throw Error(f(h.UNSUPPORTED_OPERATION));}},uri:{get:function(){return e},set:function(){throw Error(f(h.UNSUPPORTED_OPERATION));
+    }},clientId:{get:function(){return l.clientId},set:function(){throw Error(f(h.UNSUPPORTED_OPERATION));}},onConnected:{get:function(){return l.onConnected},set:function(a){if("function"===typeof a)l.onConnected=a;else throw Error(f(h.INVALID_TYPE,[typeof a,"onConnected"]));}},disconnectedPublishing:{get:function(){return l.disconnectedPublishing},set:function(a){l.disconnectedPublishing=a}},disconnectedBufferSize:{get:function(){return l.disconnectedBufferSize},set:function(a){l.disconnectedBufferSize=
+    a}},onConnectionLost:{get:function(){return l.onConnectionLost},set:function(a){if("function"===typeof a)l.onConnectionLost=a;else throw Error(f(h.INVALID_TYPE,[typeof a,"onConnectionLost"]));}},onMessageDelivered:{get:function(){return l.onMessageDelivered},set:function(a){if("function"===typeof a)l.onMessageDelivered=a;else throw Error(f(h.INVALID_TYPE,[typeof a,"onMessageDelivered"]));}},onMessageArrived:{get:function(){return l.onMessageArrived},set:function(a){if("function"===typeof a)l.onMessageArrived=
+    a;else throw Error(f(h.INVALID_TYPE,[typeof a,"onMessageArrived"]));}},trace:{get:function(){return l.traceFunction},set:function(a){if("function"===typeof a)l.traceFunction=a;else throw Error(f(h.INVALID_TYPE,[typeof a,"onTrace"]));}}});this.connect=function(a){a=a||{};A(a,{timeout:"number",userName:"string",password:"string",willMessage:"object",keepAliveInterval:"number",cleanSession:"boolean",useSSL:"boolean",invocationContext:"object",onSuccess:"function",onFailure:"function",hosts:"object",
+    ports:"object",reconnect:"boolean",mqttVersion:"number",mqttVersionExplicit:"boolean",uris:"object"});void 0===a.keepAliveInterval&&(a.keepAliveInterval=60);if(4<a.mqttVersion||3>a.mqttVersion)throw Error(f(h.INVALID_ARGUMENT,[a.mqttVersion,"connectOptions.mqttVersion"]));void 0===a.mqttVersion?(a.mqttVersionExplicit=!1,a.mqttVersion=4):a.mqttVersionExplicit=!0;if(void 0!==a.password&&void 0===a.userName)throw Error(f(h.INVALID_ARGUMENT,[a.password,"connectOptions.password"]));if(a.willMessage){if(!(a.willMessage instanceof
+    w))throw Error(f(h.INVALID_TYPE,[a.willMessage,"connectOptions.willMessage"]));a.willMessage.stringPayload=null;if("undefined"===typeof a.willMessage.destinationName)throw Error(f(h.INVALID_TYPE,[typeof a.willMessage.destinationName,"connectOptions.willMessage.destinationName"]));}"undefined"===typeof a.cleanSession&&(a.cleanSession=!0);if(a.hosts){if(!(a.hosts instanceof Array))throw Error(f(h.INVALID_ARGUMENT,[a.hosts,"connectOptions.hosts"]));if(1>a.hosts.length)throw Error(f(h.INVALID_ARGUMENT,
+    [a.hosts,"connectOptions.hosts"]));for(var b=!1,d=0;d<a.hosts.length;d++){if("string"!==typeof a.hosts[d])throw Error(f(h.INVALID_TYPE,[typeof a.hosts[d],"connectOptions.hosts["+d+"]"]));if(/^(wss?):\/\/((\[(.+)\])|([^\/]+?))(:(\d+))?(\/.*)$/.test(a.hosts[d]))if(0===d)b=!0;else{if(!b)throw Error(f(h.INVALID_ARGUMENT,[a.hosts[d],"connectOptions.hosts["+d+"]"]));}else if(b)throw Error(f(h.INVALID_ARGUMENT,[a.hosts[d],"connectOptions.hosts["+d+"]"]));}if(b)a.uris=a.hosts;else{if(!a.ports)throw Error(f(h.INVALID_ARGUMENT,
+    [a.ports,"connectOptions.ports"]));if(!(a.ports instanceof Array))throw Error(f(h.INVALID_ARGUMENT,[a.ports,"connectOptions.ports"]));if(a.hosts.length!==a.ports.length)throw Error(f(h.INVALID_ARGUMENT,[a.ports,"connectOptions.ports"]));a.uris=[];for(d=0;d<a.hosts.length;d++){if("number"!==typeof a.ports[d]||0>a.ports[d])throw Error(f(h.INVALID_TYPE,[typeof a.ports[d],"connectOptions.ports["+d+"]"]));var b=a.hosts[d],g=a.ports[d];e="ws://"+(-1!==b.indexOf(":")?"["+b+"]":b)+":"+g+c;a.uris.push(e)}}}l.connect(a)};
+    this.subscribe=function(a,b){if("string"!==typeof a&&a.constructor!==Array)throw Error("Invalid argument:"+a);b=b||{};A(b,{qos:"number",invocationContext:"object",onSuccess:"function",onFailure:"function",timeout:"number"});if(b.timeout&&!b.onFailure)throw Error("subscribeOptions.timeout specified with no onFailure callback.");if("undefined"!==typeof b.qos&&0!==b.qos&&1!==b.qos&&2!==b.qos)throw Error(f(h.INVALID_ARGUMENT,[b.qos,"subscribeOptions.qos"]));l.subscribe(a,b)};this.unsubscribe=function(a,
+    b){if("string"!==typeof a&&a.constructor!==Array)throw Error("Invalid argument:"+a);b=b||{};A(b,{invocationContext:"object",onSuccess:"function",onFailure:"function",timeout:"number"});if(b.timeout&&!b.onFailure)throw Error("unsubscribeOptions.timeout specified with no onFailure callback.");l.unsubscribe(a,b)};this.send=function(a,b,c,d){var e;if(0===arguments.length)throw Error("Invalid argument.length");if(1==arguments.length){if(!(a instanceof w)&&"string"!==typeof a)throw Error("Invalid argument:"+
+    typeof a);e=a;if("undefined"===typeof e.destinationName)throw Error(f(h.INVALID_ARGUMENT,[e.destinationName,"Message.destinationName"]));}else e=new w(b),e.destinationName=a,3<=arguments.length&&(e.qos=c),4<=arguments.length&&(e.retained=d);l.send(e)};this.publish=function(a,b,c,d){var e;if(0===arguments.length)throw Error("Invalid argument.length");if(1==arguments.length){if(!(a instanceof w)&&"string"!==typeof a)throw Error("Invalid argument:"+typeof a);e=a;if("undefined"===typeof e.destinationName)throw Error(f(h.INVALID_ARGUMENT,
+    [e.destinationName,"Message.destinationName"]));}else e=new w(b),e.destinationName=a,3<=arguments.length&&(e.qos=c),4<=arguments.length&&(e.retained=d);l.send(e)};this.disconnect=function(){l.disconnect()};this.getTraceLog=function(){return l.getTraceLog()};this.startTrace=function(){l.startTrace()};this.stopTrace=function(){l.stopTrace()};this.isConnected=function(){return l.connected}},Message:w}}("undefined"!==typeof global?global:"undefined"!==typeof self?self:"undefined"!==typeof window?window:
+    {})});</script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var qs = new URLSearchParams(location.search);
+
+  var BROKERS = [
+    { name: 'EMQX — broker.emqx.io', uri: 'wss://broker.emqx.io:8084/mqtt' },
+    { name: 'HiveMQ — broker.hivemq.com', uri: 'wss://broker.hivemq.com:8884/mqtt' }
+  ];
+  var MAX_ACC = 30;        // m/s² shown as a full bar
+  var SAMPLE_MS = 50;      // sensor sampling / publish period (20 Hz)
+  var COOLDOWN = 1000;     // ms between two ALERT decisions
+  var ACK_TIMEOUT = 3000;  // ms before a command counts as lost
+  var WINDOW_MS = 15000;   // chart window
+
+  var client = null, mode = null, base = '', connected = false, brokerUri = '';
+  var sess = Math.random().toString(36).slice(2, 6);
+  var cid = '';
+  var peers = {};          // clientId -> {role, dev, on}
+  var cfg = { thr: 12, n: 3, dl: 300 };
+
+  /* ---------- helpers ---------- */
+  var T0 = performance.timeOrigin || (Date.now() - performance.now());
+  function now() { return T0 + performance.now(); }      // wall clock with sub-ms resolution
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+  var toastT = 0;
+  function toast(msg) { var t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove('show'); }, 2800); }
+  function pill(el, state, text) { el.className = 'pill' + (state ? ' ' + state : ''); el.textContent = text; }
+  function f1(x) { return (Math.round(x * 10) / 10).toFixed(1); }
+  function f2(x) { return (Math.round(x * 100) / 100).toFixed(2); }
+  function r1(x) { return Math.round(x * 10) / 10; }
+  function devName() {
+    var u = navigator.userAgent;
+    if (/iPhone/.test(u)) return 'iPhone';
+    if (/iPad/.test(u) || (/Macintosh/.test(u) && navigator.maxTouchPoints > 1)) return 'iPad';
+    if (/Android/.test(u)) return 'Android';
+    if (/Windows/.test(u)) return 'Windows PC';
+    if (/Macintosh/.test(u)) return 'Mac';
+    if (/Linux/.test(u)) return 'Linux PC';
+    return 'Device';
+  }
+  function peersOf(role) { var a = []; for (var k in peers) if (peers[k].on && peers[k].role === role) a.push(peers[k]); return a; }
+
+  /* ---------- setup screen ---------- */
+  var roomEl = $('room'), brokerEl = $('broker');
+  roomEl.value = qs.get('room') || store('rt_room') || String(Math.floor(1000 + Math.random() * 9000));
+  if (qs.get('broker')) BROKERS.unshift({ name: 'مخصّص — ' + qs.get('broker'), uri: qs.get('broker') });
+  BROKERS.forEach(function (b) { var o = document.createElement('option'); o.value = b.uri; o.textContent = b.name; brokerEl.appendChild(o); });
+  var oc = document.createElement('option'); oc.value = 'custom'; oc.textContent = 'وسيط آخر…'; brokerEl.appendChild(oc);
+  var savedBroker = store('rt_broker');
+  if (!qs.get('broker') && savedBroker) {
+    if (BROKERS.some(function (b) { return b.uri === savedBroker; })) brokerEl.value = savedBroker;
+    else { brokerEl.value = 'custom'; $('custom').value = savedBroker; $('customWrap').hidden = false; }
+  }
+  brokerEl.addEventListener('change', function () { $('customWrap').hidden = brokerEl.value !== 'custom'; });
+  if (!window.isSecureContext) $('secureNote').hidden = false;
+
+  function readSetup() {
+    var room = roomEl.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    if (!room) { toast('اكتب رمز الغرفة (حروف إنكليزية أو أرقام)'); roomEl.focus(); return null; }
+    var uri = brokerEl.value === 'custom' ? $('custom').value.trim() : brokerEl.value;
+    if (!/^wss?:\/\/.+/.test(uri)) { toast('عنوان الوسيط يجب أن يبدأ بـ wss://'); return null; }
+    if (!/^wss?:\/\/[^\/]+\//.test(uri)) uri += '/mqtt';
+    store('rt_room', room); store('rt_broker', uri);
+    return { room: room, uri: uri };
+  }
+
+  $('goSensor').addEventListener('click', function () { start('sensor'); });
+  $('goActuator').addEventListener('click', function () { start('actuator'); });
+  $('goCloud').addEventListener('click', function () { start('cloud'); });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-back]'), function (b) {
+    b.addEventListener('click', function () { try { if (client && connected) { announce(false); client.disconnect(); } } catch (e) {} location.reload(); });
+  });
+
+  /* ---------- keep the screen on ---------- */
+  function keepAwake() { if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(function () {}); }
+  document.addEventListener('visibilitychange', function () { if (mode && document.visibilityState === 'visible') keepAwake(); });
+
+  /* ---------- start a mode (inside the tap so permissions can be requested) ---------- */
+  function start(m) {
+    var s = readSetup(); if (!s) return;
+    mode = m; base = 'ib4tech/rt/' + s.room; brokerUri = s.uri;
+    cid = 'rt-' + m + '-' + sess + Math.random().toString(16).slice(2, 8);
+    $('setup').hidden = true; $(m).hidden = false;
+    keepAwake();
+    if (m === 'sensor') { $('sRoom').textContent = 'الغرفة: ' + s.room; startSensor(); }
+    else if (m === 'actuator') { $('aRoom').textContent = 'الغرفة: ' + s.room; startActuator(); }
+    else { document.body.classList.add('dash'); $('cRoom').textContent = s.room; startCloud(); }
+    connect(s.uri);
+  }
+
+  /* ---------- MQTT ---------- */
+  function connPill() { return mode === 'sensor' ? $('sConn') : mode === 'actuator' ? $('aConn') : $('cConn'); }
+  function connect(uri) {
+    pill(connPill(), '', 'الوسيط: جارٍ الاتصال…');
+    try { client = new Paho.Client(uri, cid); }
+    catch (e) { pill(connPill(), 'off', 'عنوان الوسيط غير صالح'); return; }
+    client.onConnected = function () {
+      connected = true; pill(connPill(), 'on', 'الوسيط: متصل');
+      if (mode === 'cloud') client.subscribe(base + '/#', { qos: 1 });
+      else {
+        client.subscribe(base + '/presence/+', { qos: 1 });
+        client.subscribe(base + '/config', { qos: 1 });
+        client.subscribe(base + '/cmd', { qos: 1 });
+        if (mode === 'sensor') { client.subscribe(base + '/sync', { qos: 0 }); client.subscribe(base + '/ctl', { qos: 1 }); }
+        else client.subscribe(base + '/telemetry', { qos: 0 });
+      }
+      announce(true);
+      if (mode === 'cloud') cloudOnConnect();
+    };
+    client.onConnectionLost = function () {
+      connected = false; pill(connPill(), 'off', 'الوسيط: انقطع — إعادة المحاولة…');
+      if (mode === 'cloud') $('nBroker').classList.add('off');
+    };
+    client.onMessageArrived = onMessage;
+    var will = new Paho.Message(JSON.stringify({ role: mode, dev: devName(), on: false }));
+    will.destinationName = base + '/presence/' + cid; will.qos = 1; will.retained = true;
+    client.connect({
+      timeout: 10, keepAliveInterval: 20, cleanSession: true, reconnect: true, mqttVersion: 4, willMessage: will,
+      onFailure: function () { connected = false; pill(connPill(), 'off', 'فشل الاتصال بالوسيط'); toast('تعذّر الاتصال: جرّب الوسيط الآخر'); }
+    });
+  }
+  function publish(topic, payload, qos, retained) {
+    if (!client || !connected) return false;
+    try { client.publish(topic, typeof payload === 'string' ? payload : JSON.stringify(payload), qos || 0, !!retained); return true; } catch (e) { return false; }
+  }
+  function announce(on) { publish(base + '/presence/' + cid, { role: mode, dev: devName(), on: on }, 1, true); }
+  window.addEventListener('pagehide', function () { if (mode) announce(false); });
+
+  function onMessage(msg) {
+    var tr = now();
+    var t = msg.destinationName.slice(base.length + 1), p = msg.payloadString, d;
+    try { d = JSON.parse(p); } catch (e) { return; }
+    if (t.indexOf('presence/') === 0) { peers[t.slice(9)] = d; onPresence(); }
+    else if (t === 'config') { cfg = d; onConfig(); }
+    if (mode === 'cloud') cloudOnMessage(t, d, p, tr);
+    else if (mode === 'sensor') sensorOnMessage(t, d);
+    else actuatorOnMessage(t, d);
+  }
+
+  function onPresence() {
+    var cl = peersOf('cloud').length > 0, se = peersOf('sensor'), ac = peersOf('actuator');
+    if (mode === 'sensor') {
+      pill($('sCloud'), cl ? 'on' : 'off', 'المعالج السحابي: ' + (cl ? 'متصل' : 'غير متصل'));
+      pill($('sPeer'), ac.length ? 'on' : 'off', 'المنفّذ: ' + ac.length);
+    } else if (mode === 'actuator') {
+      pill($('aCloud'), cl ? 'on' : 'off', 'المعالج السحابي: ' + (cl ? 'متصل' : 'غير متصل'));
+      pill($('aPeer'), se.length ? 'on' : 'off', 'الحساس: ' + (se.length ? 'متصل' : 'غير متصل'));
+    } else {
+      $('nSensor').classList.toggle('off', !se.length);
+      $('nSensorSub').textContent = se.length ? se.map(function (x) { return x.dev; }).join(' + ') : 'offline';
+      $('nActuator').classList.toggle('off', !ac.length);
+      $('nActSub').textContent = ac.length ? ac.map(function (x) { return x.dev; }).join(' + ') : 'offline';
+      if (se.length) syncBurst();
+    }
+  }
+  function onConfig() {
+    if (mode === 'sensor') { $('sThr').textContent = cfg.thr; $('mark').style.left = 'calc(' + Math.min(100, cfg.thr / MAX_ACC * 100) + '% - 1px)'; }
+  }
+
+  /* =====================================================
+     SENSOR — samples the accelerometer and publishes raw readings. No decision here.
+     ===================================================== */
+  var cur = 0, peak = 0, peakT = 0, gotMotion = false, seq = 0, fakeUntil = 0, sAlerts = 0;
+
+  function startSensor() {
+    onConfig();
+    $('fake').addEventListener('click', function () { fakeUntil = performance.now() + 450; });
+    var DME = window.DeviceMotionEvent;
+    if (DME && typeof DME.requestPermission === 'function') {       // iOS 13+: must be asked from a tap
+      DME.requestPermission().then(function (s) {
+        if (s === 'granted') window.addEventListener('devicemotion', onMotion); else $('motionNote').hidden = false;
+      }).catch(function () { $('motionNote').hidden = false; });
+    } else if (DME) window.addEventListener('devicemotion', onMotion);
+    setTimeout(function () { if (!gotMotion) $('motionNote').hidden = false; }, 2500);
+
+    setInterval(function () {
+      var f = $('fill'); $('val').textContent = f1(cur);
+      f.style.width = Math.min(100, cur / MAX_ACC * 100) + '%'; f.className = cur >= cfg.thr ? 'hot' : '';
+    }, 80);
+
+    setInterval(function () {       // periodic task: one reading every SAMPLE_MS
+      var v, t;
+      if (performance.now() < fakeUntil) { v = 20 + Math.random() * 4; t = now(); cur = v; }
+      else { v = peak; t = peakT || now(); if (!gotMotion) cur = 0; }
+      peak = 0; peakT = 0;
+      if (publish(base + '/telemetry', { n: ++seq, v: +v.toFixed(2), t: r1(t), s: cid }, 0)) $('sSent').textContent = seq; else seq--;
+    }, SAMPLE_MS);
+  }
+
+  function onMotion(e) {
+    var a = e.acceleration, m;
+    if (a && a.x != null) m = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+    else {
+      var g = e.accelerationIncludingGravity; if (!g || g.x == null) return;
+      m = Math.abs(Math.sqrt(g.x * g.x + g.y * g.y + g.z * g.z) - 9.81);
+    }
+    if (!gotMotion) { gotMotion = true; $('motionNote').hidden = true; }
+    if (performance.now() >= fakeUntil) cur = m;
+    if (m >= peak) { peak = m; peakT = now(); }
+  }
+
+  function sensorOnMessage(t, d) {
+    if (t === 'sync') publish(base + '/syncr', { k: d.k, s: cid, ts: r1(now()) }, 0);   // clock-sync reply
+    else if (t === 'cmd' && d.type === 'ALERT') { sAlerts++; $('sAlerts').textContent = sAlerts; }
+    else if (t === 'ctl' && d.op === 'probe') {
+      var left = Math.min(50, +d.count || 20), gap = Math.max(100, +d.gap || 300);
+      (function tick() {
+        if (left-- <= 0) return;
+        publish(base + '/telemetry', { n: ++seq, v: +cur.toFixed(2), x: 1, t: r1(now()), s: cid }, 0);
+        setTimeout(tick, gap);
+      })();
+    }
+  }
+
+  /* =====================================================
+     ACTUATOR — executes the command decided by the cloud, then acknowledges.
+     ===================================================== */
+  var audio = null, soundOn = true, seen = [], nAlert = 0, nTest = 0, stageT = 0;
+
+  function startActuator() {
+    try { var AC = window.AudioContext || window.webkitAudioContext; if (AC) { audio = new AC(); audio.resume(); } } catch (e) {}
+    if (!navigator.vibrate) $('vibNote').hidden = false;
+    $('tryVib').addEventListener('click', function () { act('ALERT'); });
+    $('sound').addEventListener('click', function () {
+      soundOn = !soundOn; this.textContent = 'الصوت: ' + (soundOn ? 'مفعّل' : 'متوقف'); this.setAttribute('aria-pressed', soundOn);
+    });
+  }
+  function beep(freq, dur) {
+    if (!audio || !soundOn) return;
+    try {
+      var o = audio.createOscillator(), g = audio.createGain();
+      o.frequency.value = freq; o.connect(g); g.connect(audio.destination);
+      g.gain.setValueAtTime(0.25, audio.currentTime); g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + dur);
+      o.start(); o.stop(audio.currentTime + dur);
+    } catch (e) {}
+  }
+  function act(type) {
+    var alert = type === 'ALERT', vib = false;
+    try { if (navigator.vibrate) vib = navigator.vibrate(alert ? [400, 120, 400, 120, 400] : 60); } catch (e) {}
+    beep(alert ? 880 : 520, alert ? 0.6 : 0.12);
+    var st = $('stage'); st.className = ''; void st.offsetWidth; st.className = alert ? 'alert' : 'test';
+    $('aIco').textContent = alert ? '🚨' : '✅';
+    $('aTtl').textContent = alert ? 'تنبيه! أمر من الكلاود' : 'رسالة اختبار';
+    document.body.classList.toggle('flash', alert);
+    clearTimeout(stageT);
+    stageT = setTimeout(function () { st.className = ''; document.body.classList.remove('flash'); $('aIco').textContent = '⏳'; $('aTtl').textContent = 'بانتظار أمر الكلاود'; }, alert ? 1800 : 300);
+    return vib;
+  }
+  function actuatorOnMessage(t, d) {
+    if (t === 'cmd') {
+      var t1 = performance.now(), dup = seen.indexOf(d.id) !== -1, vib = false;
+      if (!dup) {
+        seen.push(d.id); if (seen.length > 200) seen.shift();
+        vib = act(d.type);
+        if (d.type === 'ALERT') { nAlert++; $('aAlerts').textContent = nAlert; $('aSub').textContent = 'القيمة: ' + f1(+d.v || 0) + ' m/s² — ' + new Date().toLocaleTimeString('en-GB'); }
+        else { nTest++; $('aTests').textContent = nTest; }
+      }
+      var proc = performance.now() - t1;
+      publish(base + '/ack', { proc: +proc.toFixed(2), dev: devName(), vib: vib, id: d.id }, 1);
+      $('aProc').textContent = f1(proc);
+    } else if (t === 'telemetry' && !d.x) {
+      var v = +d.v || 0, f = $('aFill');
+      $('aVal').textContent = f1(v);
+      f.style.width = Math.min(100, v / MAX_ACC * 100) + '%'; f.className = v >= cfg.thr ? 'hot' : '';
+    }
+  }
+
+  /* =====================================================
+     CLOUD — rule engine + live dashboard
+     ===================================================== */
+  var buf = [], samples = [], marks = [], events = [], pendingEv = {}, doneEv = {};
+  var evSeq = 0, lastFire = 0, msgTimes = [], syncK = 0, syncSent = {}, syncs = {}, lastTelLog = 0, lastTelPart = 0;
+  var NS = 'http://www.w3.org/2000/svg', parts = [];
+  var PATHS = { t1: [173, 226, 450, 226], t2: [520, 197, 520, 154], c1: [580, 154, 580, 197], c2: [650, 226, 930, 226], a1: [930, 254, 650, 254] };
+
+  function startCloud() {
+    try { $('nBrokerSub').textContent = brokerUri.replace(/^wss?:\/\//, '').replace(/[:\/].*$/, ''); } catch (e) {}
+    $('logBase').textContent = base + '/#';
+    var saved = null; try { saved = JSON.parse(store('rt_cfg') || 'null'); } catch (e) {}
+    if (saved && saved.thr) cfg = { thr: +saved.thr || 12, n: +saved.n || 3, dl: +saved.dl || 300 };
+    $('cThr').value = cfg.thr; $('cN').value = cfg.n; $('cDl').value = cfg.dl; showCfg();
+    $('cThr').addEventListener('input', function () { cfg.thr = +this.value; pushCfg(); });
+    $('cN').addEventListener('input', function () { cfg.n = +this.value; pushCfg(); });
+    $('cDl').addEventListener('change', function () { cfg.dl = Math.max(1, +this.value || 300); pushCfg(); renderLat(); });
+    $('probe').addEventListener('click', function () {
+      if (!peersOf('sensor').length) { toast('الحساس غير متصل'); return; }
+      if (!peersOf('actuator').length) { toast('المنفّذ غير متصل'); return; }
+      publish(base + '/ctl', { op: 'probe', count: 20, gap: 300 }, 1);
+    });
+    $('cReset').addEventListener('click', function () { events = []; marks = []; renderLat(); });
+    $('cCsv').addEventListener('click', cloudCsv);
+    $('fs').addEventListener('click', function () {
+      var d = document.documentElement;
+      try { if (document.fullscreenElement) document.exitFullscreen(); else if (d.requestFullscreen) d.requestFullscreen().catch(function () {}); } catch (e) {}
+    });
+    setInterval(function () {
+      var t = performance.now(); while (msgTimes.length && t - msgTimes[0] > 1000) msgTimes.shift();
+      $('cRate').textContent = msgTimes.length; $('nBrokerRate').textContent = msgTimes.length + ' msg/s';
+      $('cClock').textContent = new Date().toLocaleTimeString('en-GB');
+    }, 500);
+    setInterval(sendSync, 2000);
+    requestAnimationFrame(frame);
+    renderLat();
+  }
+  function cloudOnConnect() { $('nBroker').classList.remove('off'); publish(base + '/config', cfg, 1, true); syncBurst(); }
+  function showCfg() {
+    $('cThrV').textContent = cfg.thr; $('cNV').textContent = cfg.n;
+    $('pFiltL').textContent = 'moving average, N = ' + cfg.n;
+    $('pRuleL').textContent = 'IF avg ≥ ' + cfg.thr;
+    $('nEngineRule').textContent = 'IF avg(' + cfg.n + ') ≥ ' + cfg.thr + ' → ALERT';
+  }
+  function pushCfg() { showCfg(); store('rt_cfg', JSON.stringify(cfg)); publish(base + '/config', cfg, 1, true); }
+
+  /* --- clock synchronisation (Cristian's algorithm) so sensor→cloud delay can be measured --- */
+  function sendSync() { if (!connected) return; var k = ++syncK; syncSent[k] = now(); publish(base + '/sync', { k: k }, 0); if (k > 40) delete syncSent[k - 40]; }
+  var burstT = 0;
+  function syncBurst() { if (performance.now() - burstT < 3000) return; burstT = performance.now(); for (var i = 0; i < 5; i++) setTimeout(sendSync, i * 250); }
+  function onSyncReply(d, tr) {
+    var t0 = syncSent[d.k]; if (!t0) return;
+    var rtt = tr - t0, off = d.ts - (t0 + rtt / 2);          // off = sensorClock − cloudClock
+    var a = syncs[d.s] || (syncs[d.s] = []); a.push({ rtt: rtt, off: off }); if (a.length > 8) a.shift();
+    var b = bestSync(d.s);
+    $('syncInfo').textContent = 'clock sync (Cristian): offset = ' + (b.off >= 0 ? '+' : '') + f1(b.off) + ' ms, round trip = ' + f1(b.rtt) + ' ms';
+  }
+  function bestSync(s) { var a = syncs[s]; if (!a || !a.length) return null; return a.reduce(function (x, y) { return y.rtt < x.rtt ? y : x; }); }
+
+  function cloudOnMessage(t, d, raw, tr) {
+    msgTimes.push(performance.now());
+    if (t === 'telemetry') {
+      if (d.x) { issue('TEST', d, tr, +d.v || 0); logLine(t, raw); }
+      else { engine(d, tr); if (tr - lastTelLog > 500) { lastTelLog = tr; logLine(t, raw); } }
+    } else if (t === 'ack') { onAck(d, tr); logLine(t, raw); }
+    else if (t === 'syncr') onSyncReply(d, tr);
+    else if (t === 'sync') { /* own ping */ }
+    else logLine(t.indexOf('presence/') === 0 ? 'presence' : t, raw);
+  }
+
+  /* --- the rule engine: receive → filter → rule → action --- */
+  function engine(d, tr) {
+    var v = +d.v || 0;
+    buf.push(v); while (buf.length > cfg.n) buf.shift();
+    var avg = buf.reduce(function (a, b) { return a + b; }, 0) / buf.length;
+    samples.push({ t: tr, v: v, f: avg });
+    var hit = avg >= cfg.thr, cool = tr - lastFire <= COOLDOWN, fired = false;
+    if (hit && !cool) { lastFire = tr; fired = true; issue('ALERT', d, tr, avg); marks.push(tr); }
+    // panel
+    $('pRaw').textContent = '#' + d.n + '  ' + f2(v);
+    $('pAvg').textContent = f2(avg);
+    var rb = $('pRule'); rb.textContent = hit ? 'TRUE' : 'FALSE'; rb.className = 'badge' + (hit ? ' t' : '');
+    $('st3').className = 'step' + (hit ? ' on' : '');
+    $('st4').className = 'step' + (fired || (cool && hit) ? ' on' : '');
+    $('pAct').textContent = fired ? 'ALERT ▶' : cool ? 'cooldown ' + f1((COOLDOWN - (tr - lastFire)) / 1000) + 's' : 'idle';
+    $('nSensorVal').textContent = f1(v) + ' m/s²';
+    $('nEngineVal').textContent = 'avg = ' + f2(avg);
+    $('nEngine').classList.toggle('fire', hit);
+    if (performance.now() - lastTelPart > 160 && !document.hidden) {
+      lastTelPart = performance.now(); hitNode('nSensor');
+      spawn('t1', '#38c9ff', 4, 330, function () { hitNode('nBroker'); spawn('t2', '#38c9ff', 4, 180); });
+    }
+  }
+
+  function issue(type, d, tr, value) {
+    var n = ++evSeq, id = 'c' + sess + '-' + n, b = bestSync(d.s);
+    var ev = { n: n, id: id, type: type, v: value, src: d.n, acks: 0, lost: false };
+    publish(base + '/cmd', { type: type, v: +value.toFixed(2), src: d.n, id: id }, 1);
+    ev.tp = now(); ev.proc = ev.tp - tr;
+    ev.s2c = b ? Math.max(0, tr - (d.t - b.off)) : null;
+    pendingEv[id] = ev;
+    setTimeout(function () { if (!pendingEv[id]) return; delete pendingEv[id]; ev.lost = true; events.push(ev); renderLat(); }, ACK_TIMEOUT);
+    if (!document.hidden) {
+      var col = type === 'ALERT' ? '#ff5a5a' : '#f2c14e', r = type === 'ALERT' ? 8 : 5;
+      spawn('c1', col, r, 180, function () { hitNode('nBroker'); spawn('c2', col, r, 380, function () { if (type === 'ALERT') fireNode('nActuator'); else hitNode('nActuator'); }); });
+    }
+  }
+
+  function onAck(a, tr) {
+    var ev = pendingEv[a.id];
+    if (!ev) { if (doneEv[a.id]) doneEv[a.id].acks++; return; }
+    delete pendingEv[a.id]; doneEv[a.id] = ev;
+    ev.exec = +a.proc || 0; ev.c2a = Math.max(0, (tr - ev.tp - ev.exec) / 2);
+    ev.total = (ev.s2c || 0) + ev.proc + ev.c2a + ev.exec; ev.dev = a.dev || ''; ev.vib = !!a.vib; ev.acks = 1;
+    events.push(ev); renderLat();
+    if (!document.hidden) spawn('a1', '#3ddc97', 5, 380, function () { hitNode('nBroker'); spawn('t2', '#3ddc97', 5, 180); });
+  }
+
+  function renderLat() {
+    var dl = cfg.dl, ok = events.filter(function (e) { return !e.lost; }), lost = events.length - ok.length;
+    $('dN').textContent = events.length;
+    var nAl = events.filter(function (e) { return e.type === 'ALERT' && !e.lost; }).length;
+    $('nActVal').textContent = nAl + ' alerts';
+    if (ok.length) {
+      var r = ok.map(function (e) { return e.total; }), avg = r.reduce(function (a, b) { return a + b; }, 0) / r.length;
+      var sd = Math.sqrt(r.reduce(function (a, b) { return a + (b - avg) * (b - avg); }, 0) / r.length);
+      var miss = r.filter(function (x) { return x > dl; }).length + lost;
+      $('dAvg').textContent = f1(avg); $('dMax').textContent = f1(Math.max.apply(null, r)); $('dJit').textContent = f1(sd);
+      $('dMiss').textContent = miss + ' (' + Math.round(miss / events.length * 100) + '%)'; $('dMissBox').className = 'dstat' + (miss ? ' bad' : '');
+    } else {
+      $('dAvg').textContent = $('dMax').textContent = $('dJit').textContent = '–';
+      $('dMiss').textContent = lost ? lost + ' (100%)' : '0'; $('dMissBox').className = 'dstat' + (lost ? ' bad' : '');
+    }
+    // last event: stacked bar
+    var e = ok[ok.length - 1], segs = $('sbar').querySelectorAll('i');
+    if (e) {
+      var scale = Math.max(e.total, dl) * 1.08, w = [e.s2c || 0, e.proc, e.c2a, e.exec], m = e.total > dl;
+      for (var i = 0; i < 4; i++) segs[i].style.width = (w[i] / scale * 100) + '%';
+      $('dlMark').hidden = false; $('dlMark').style.left = (dl / scale * 100) + '%';
+      $('lTitle').textContent = '#' + e.n + ' ' + e.type + (e.dev ? ' → ' + e.dev : '');
+      $('lTotal').textContent = f1(e.total);
+      var lr = $('lRes'); lr.textContent = m ? 'DEADLINE MISS' : 'OK ≤ ' + dl + ' ms'; lr.className = 'badge ' + (m ? 'miss' : 'ok');
+      $('lg1').textContent = e.s2c == null ? 'n/a' : f1(e.s2c) + ' ms'; $('lg2').textContent = f2(e.proc) + ' ms';
+      $('lg3').textContent = f1(e.c2a) + ' ms'; $('lg4').textContent = f1(e.exec) + ' ms';
+      $('latS2C').textContent = e.s2c == null ? '– ms' : f1(e.s2c) + ' ms';
+      $('latC2A').textContent = f1(e.c2a) + ' ms';
+    } else {
+      for (var j = 0; j < 4; j++) segs[j].style.width = '0'; $('dlMark').hidden = true;
+      $('lTitle').textContent = 'لا توجد أحداث بعد'; $('lTotal').textContent = '–'; $('lRes').textContent = '–'; $('lRes').className = 'badge';
+      ['lg1', 'lg2', 'lg3', 'lg4'].forEach(function (k) { $(k).textContent = '–'; });
+    }
+    var html = '';
+    events.slice(-3).reverse().forEach(function (x) {
+      if (x.lost) html += '<tr><td>' + x.n + '</td><td>' + x.type + '</td><td colspan="5">no ACK within ' + ACK_TIMEOUT / 1000 + ' s</td><td class="miss">LOST</td></tr>';
+      else html += '<tr><td>' + x.n + '</td><td>' + x.type + '</td><td>' + (x.s2c == null ? '–' : f1(x.s2c)) + '</td><td>' + f2(x.proc) + '</td><td>' + f1(x.c2a) + '</td><td>' + f1(x.exec) + '</td><td><b>' + f1(x.total) + '</b></td><td class="' + (x.total > dl ? 'miss">MISS' : 'okc">OK') + '</td></tr>';
+    });
+    $('cRows').innerHTML = html || '<tr><td colspan="8" style="color:#7f94ad">هزّ الحساس أو اضغط «اختبار المسار الكامل»</td></tr>';
+  }
+
+  function cloudCsv() {
+    if (!events.length) { toast('لا توجد نتائج بعد'); return; }
+    var L = ['n,type,value_ms2,sensor_to_cloud_ms,processing_ms,cloud_to_actuator_ms,execute_ms,total_ms,deadline_ms,result,actuator'];
+    events.forEach(function (e) {
+      L.push(e.lost ? [e.n, e.type, e.v.toFixed(2), '', '', '', '', '', cfg.dl, 'LOST', ''].join(',')
+        : [e.n, e.type, e.v.toFixed(2), e.s2c == null ? '' : e.s2c.toFixed(1), e.proc.toFixed(2), e.c2a.toFixed(1), e.exec.toFixed(1), e.total.toFixed(1), cfg.dl, e.total > cfg.dl ? 'MISS' : 'OK', e.dev].join(','));
+    });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([L.join('\n')], { type: 'text/csv' }));
+    a.download = 'rt-cloud-results.csv'; document.body.appendChild(a); a.click(); a.remove();
+  }
+
+  /* --- message stream --- */
+  function logLine(kind, raw) {
+    var box = $('log'), d = document.createElement('div'), t = new Date(), ms = ('00' + t.getMilliseconds()).slice(-3);
+    d.className = 'k-' + kind;
+    var ts = document.createElement('span'); ts.className = 'ts'; ts.textContent = t.toLocaleTimeString('en-GB') + '.' + ms + '  ';
+    d.appendChild(ts); d.appendChild(document.createTextNode((kind + '        ').slice(0, 10) + raw));
+    box.appendChild(d); while (box.childNodes.length > 40) box.removeChild(box.firstChild);
+  }
+
+  /* --- pipeline animation --- */
+  function spawn(path, color, r, dur, next) {
+    var c = document.createElementNS(NS, 'circle');
+    c.setAttribute('r', r); c.setAttribute('fill', color); c.setAttribute('cx', PATHS[path][0]); c.setAttribute('cy', PATHS[path][1]); if (r > 4) c.setAttribute('filter', 'url(#glow)');
+    $('parts').appendChild(c); parts.push({ el: c, p: PATHS[path], t0: performance.now(), dur: dur, next: next });
+  }
+  function hitNode(id) { var n = $(id); n.classList.add('hit'); clearTimeout(n._t); n._t = setTimeout(function () { n.classList.remove('hit'); }, 220); }
+  function fireNode(id) { var n = $(id); n.classList.add('fire'); clearTimeout(n._f); n._f = setTimeout(function () { n.classList.remove('fire'); }, 1500); }
+
+  function frame() {
+    var t = performance.now();
+    for (var i = parts.length - 1; i >= 0; i--) {
+      var q = parts[i], k = (t - q.t0) / q.dur;
+      if (k >= 1) { q.el.remove(); parts.splice(i, 1); if (q.next) q.next(); continue; }
+      q.el.setAttribute('cx', q.p[0] + (q.p[2] - q.p[0]) * k); q.el.setAttribute('cy', q.p[1] + (q.p[3] - q.p[1]) * k);
+    }
+    drawChart();
+    requestAnimationFrame(frame);
+  }
+
+  /* --- live chart --- */
+  function drawChart() {
+    var cv = $('chart'), dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+    if (!W) return;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H); g.direction = 'ltr';
+    var tN = now(), t0 = tN - WINDOW_MS;
+    while (samples.length && samples[0].t < t0 - 500) samples.shift();
+    while (marks.length && marks[0] < t0) marks.shift();
+    var top = 30; samples.forEach(function (s) { if (s.v > top) top = s.v; }); top = Math.ceil(top / 10) * 10;
+    var L = 34, R = 8, T = 8, B = 20;
+    function X(t) { return L + (t - t0) / WINDOW_MS * (W - L - R); }
+    function Y(v) { return T + (1 - v / top) * (H - T - B); }
+    g.font = '11px system-ui, sans-serif'; g.textBaseline = 'middle'; g.lineWidth = 1;
+    for (var v = 0; v <= top; v += 10) {
+      g.strokeStyle = '#16283f'; g.beginPath(); g.moveTo(L, Y(v)); g.lineTo(W - R, Y(v)); g.stroke();
+      g.fillStyle = '#7f94ad'; g.textAlign = 'right'; g.fillText(v, L - 6, Y(v));
+    }
+    g.textAlign = 'center';
+    for (var s = 0; s <= 15; s += 5) g.fillText(s === 0 ? 'now' : '-' + s + 's', X(tN - s * 1000) - (s === 0 ? 10 : 0), H - 8);
+    // ALERT markers
+    marks.forEach(function (m) {
+      g.strokeStyle = 'rgba(255,90,90,.85)'; g.lineWidth = 2; g.beginPath(); g.moveTo(X(m), T); g.lineTo(X(m), H - B); g.stroke();
+      g.fillStyle = '#ff5a5a'; var nr = X(m) > W - R - 48; g.textAlign = nr ? 'right' : 'left'; g.fillText('ALERT', X(m) + (nr ? -4 : 4), T + 8);
+    });
+    // threshold
+    g.setLineDash([6, 5]); g.strokeStyle = '#ff5a5a'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(L, Y(cfg.thr)); g.lineTo(W - R, Y(cfg.thr)); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#ff5a5a'; g.textAlign = 'left'; g.fillText('threshold ' + cfg.thr + ' m/s²', L + 6, Y(cfg.thr) - 9);
+    if (samples.length < 2) return;
+    // raw area + line
+    g.beginPath(); g.moveTo(X(samples[0].t), Y(0));
+    samples.forEach(function (p) { g.lineTo(X(p.t), Y(p.v)); });
+    g.lineTo(X(samples[samples.length - 1].t), Y(0)); g.closePath();
+    var gr = g.createLinearGradient(0, T, 0, H - B); gr.addColorStop(0, 'rgba(56,201,255,.35)'); gr.addColorStop(1, 'rgba(56,201,255,0)');
+    g.fillStyle = gr; g.fill();
+    g.beginPath(); samples.forEach(function (p, i) { if (i) g.lineTo(X(p.t), Y(p.v)); else g.moveTo(X(p.t), Y(p.v)); });
+    g.strokeStyle = '#38c9ff'; g.lineWidth = 1.5; g.stroke();
+    // filtered
+    g.beginPath(); samples.forEach(function (p, i) { if (i) g.lineTo(X(p.t), Y(p.f)); else g.moveTo(X(p.t), Y(p.f)); });
+    g.strokeStyle = '#f2c14e'; g.lineWidth = 2.2; g.stroke();
+  }
+})();
+</script>
+</body>
+</html>
